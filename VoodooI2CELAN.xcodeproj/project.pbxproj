@@ -7,15 +7,18 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		7B30D68B1F910BAB00190488 /* VoodooI2CELAN.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 7B30D68A1F910BAB00190488 /* VoodooI2CELAN.hpp */; };
-		7B30D68D1F910BAB00190488 /* VoodooI2CELAN.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B30D68C1F910BAB00190488 /* VoodooI2CELAN.cpp */; };
+		7B30D6A41F91262100190488 /* VoodooI2CELANTouchpadDriver.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B30D6A21F91262100190488 /* VoodooI2CELANTouchpadDriver.cpp */; };
+		7B30D6A51F91262100190488 /* VoodooI2CELANTouchpadDriver.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 7B30D6A31F91262100190488 /* VoodooI2CELANTouchpadDriver.hpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		7B30D6871F910BAB00190488 /* VoodooI2CELAN.kext */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VoodooI2CELAN.kext; sourceTree = BUILT_PRODUCTS_DIR; };
-		7B30D68A1F910BAB00190488 /* VoodooI2CELAN.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = VoodooI2CELAN.hpp; sourceTree = "<group>"; };
-		7B30D68C1F910BAB00190488 /* VoodooI2CELAN.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = VoodooI2CELAN.cpp; sourceTree = "<group>"; };
 		7B30D68E1F910BAB00190488 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		7B30D6A21F91262100190488 /* VoodooI2CELANTouchpadDriver.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = VoodooI2CELANTouchpadDriver.cpp; sourceTree = "<group>"; };
+		7B30D6A31F91262100190488 /* VoodooI2CELANTouchpadDriver.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = VoodooI2CELANTouchpadDriver.hpp; sourceTree = "<group>"; };
+		7B30D6AA1F9151AE00190488 /* Kernel.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Kernel.framework; path = System/Library/Frameworks/Kernel.framework; sourceTree = SDKROOT; };
+		7B30D6AC1F9151B300190488 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
+		7B5723661F927D1400A672B5 /* LinuxELANI2C.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LinuxELANI2C.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -34,6 +37,7 @@
 			children = (
 				7B30D6891F910BAB00190488 /* VoodooI2CELAN */,
 				7B30D6881F910BAB00190488 /* Products */,
+				7B30D6A91F9151AE00190488 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -48,11 +52,21 @@
 		7B30D6891F910BAB00190488 /* VoodooI2CELAN */ = {
 			isa = PBXGroup;
 			children = (
-				7B30D68A1F910BAB00190488 /* VoodooI2CELAN.hpp */,
-				7B30D68C1F910BAB00190488 /* VoodooI2CELAN.cpp */,
 				7B30D68E1F910BAB00190488 /* Info.plist */,
+				7B30D6A21F91262100190488 /* VoodooI2CELANTouchpadDriver.cpp */,
+				7B30D6A31F91262100190488 /* VoodooI2CELANTouchpadDriver.hpp */,
+				7B5723661F927D1400A672B5 /* LinuxELANI2C.h */,
 			);
 			path = VoodooI2CELAN;
+			sourceTree = "<group>";
+		};
+		7B30D6A91F9151AE00190488 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				7B30D6AC1F9151B300190488 /* IOKit.framework */,
+				7B30D6AA1F9151AE00190488 /* Kernel.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -62,7 +76,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7B30D68B1F910BAB00190488 /* VoodooI2CELAN.hpp in Headers */,
+				7B30D6A51F91262100190488 /* VoodooI2CELANTouchpadDriver.hpp in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -134,7 +148,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7B30D68D1F910BAB00190488 /* VoodooI2CELAN.cpp in Sources */,
+				7B30D6A41F91262100190488 /* VoodooI2CELANTouchpadDriver.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -240,6 +254,7 @@
 				MODULE_VERSION = 1.0.0d1;
 				PRODUCT_BUNDLE_IDENTIFIER = me.kishorprins.VoodooI2CELAN;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
 				WRAPPER_EXTENSION = kext;
 			};
 			name = Debug;
@@ -254,6 +269,7 @@
 				MODULE_VERSION = 1.0.0d1;
 				PRODUCT_BUNDLE_IDENTIFIER = me.kishorprins.VoodooI2CELAN;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
 				WRAPPER_EXTENSION = kext;
 			};
 			name = Release;
@@ -277,6 +293,7 @@
 				7B30D6931F910BAB00190488 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
