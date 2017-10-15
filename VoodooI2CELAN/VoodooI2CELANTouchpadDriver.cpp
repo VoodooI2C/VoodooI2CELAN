@@ -11,6 +11,8 @@
 #include "VoodooI2CELANTouchpadDriver.hpp"
 #include "LinuxELANI2C.h"
 
+OSDefineMetaClassAndStructors(VoodooI2CELANTouchpadDriver, IOService);
+
 bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
     if(!IOService::start(provider)) {
         return false;
@@ -338,4 +340,8 @@ void VoodooI2CELANTouchpadDriver::releaseResources() {
         api->release();
         api = NULL;
     }
+}
+
+void VoodooI2CELANTouchpadDriver::stop(IOService* provider) {
+    
 }
