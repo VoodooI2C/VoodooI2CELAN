@@ -22,8 +22,6 @@
 #include <sys/kern_control.h>
 #include <libkern/OSMalloc.h>
 
-#define VOODOOI2C_ELAN_CTL "me.kishorprins.VoodooI2CELANTouchpadDriver"
-
 class VoodooI2CELANTouchpadDriver : public IOService {
     OSDeclareDefaultStructors(VoodooI2CELANTouchpadDriver);
     VoodooI2CDeviceNub* api;
@@ -39,6 +37,10 @@ class VoodooI2CELANTouchpadDriver : public IOService {
     lck_grp_t* lockGroup;
     lck_mtx_t* lock;
     
+    int productId;
+    
+    VoodooI2CMultitouchInterface *multitouchInterface;
+    
     IOWorkLoop* workLoop;
     IOCommandGate* commandGate;
     IOInterruptEventSource* interruptSource;
@@ -49,6 +51,8 @@ class VoodooI2CELANTouchpadDriver : public IOService {
     IOReturn readRaw16Data(uint8_t reg, size_t len, uint8_t* values);
     bool initELANDevice();
     bool checkForASUSFirmware(uint8_t productId, uint8_t ic_type);
+    bool publishMultitouchInterface();
+    void unpublishMultitouchInterface();
     void handleELANInput();
     void setELANDevicePower(bool enable);
     void releaseResources();
@@ -62,4 +66,4 @@ public:
     virtual VoodooI2CELANTouchpadDriver* probe(IOService* provider, SInt32* score) override;
 };
 
-#endif /* VOODOOI2C_ELAN_HID_EVENT_DRIVER_HPP */
+#endif /* VOODOOI2C_ELAN_TOUCHPAD_DRIVER_HPP */

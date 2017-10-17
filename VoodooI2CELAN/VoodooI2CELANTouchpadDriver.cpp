@@ -11,6 +11,8 @@
 #include "VoodooI2CELANTouchpadDriver.hpp"
 #include "LinuxELANI2C.h"
 
+#define VOODOOI2C_ELAN_CTL "me.kishorprins.VoodooI2CELANTouchpadDriver"
+
 #define super IOService
 OSDefineMetaClassAndStructors(VoodooI2CELANTouchpadDriver, IOService);
 
@@ -116,6 +118,8 @@ bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
     registerPowerDriver(this, VoodooI2CIOPMPowerStates, kVoodooI2CIOPMNumberPowerStates);
     
     IOSleep(100);
+    
+    publishMultitouchInterface();
     
     readyForInput = true;
     
@@ -323,6 +327,8 @@ bool VoodooI2CELANTouchpadDriver::initELANDevice() {
         return false;
     }
     
+    this->productId = productId;
+    
     IOLog("ELAN: ProdID: %d Vers: %d Csum: %d SmVers: %d ICType: %d IAPVers: %d Max X: %d Max Y: %d\n", productId, version, ictype, csum, smvers, iapversion, max_x, max_y);
 
     return true;
@@ -365,6 +371,53 @@ VoodooI2CELANTouchpadDriver* VoodooI2CELANTouchpadDriver::probe(IOService* provi
     return this;
 }
 
+bool VoodooI2CELANTouchpadDriver::publishMultitouchInterface() {
+    multitouchInterface = new VoodooI2CMultitouchInterface();
+   
+    if(multitouchInterface == NULL) {
+        IOLog("ELAN: No memory to allocate VoodooI2CMultitouchInterface instance\n");
+        goto multitouchExit;
+    }
+    
+    if(!multitouchInterface->init(NULL)) {
+        IOLog("ELAN: Failed to init multitouch interface\n");
+        goto multitouchExit;
+    }
+    
+    if (!multitouchInterface->attach(this)) {
+        IOLog("ELAN: Failed to attach multitouch interface\n");
+        goto multitouchExit;
+    }
+    
+    if (!multitouchInterface->start(this)) {
+        IOLog("ELAN: Failed to start multitouch interface\n");
+        goto multitouchExit;
+    }
+    
+    // Assume we are a touchpad
+    multitouchInterface->setProperty(kIOHIDDisplayIntegratedKey, true);
+    // 0x04f3 is Elan's Vendor Id
+    multitouchInterface->setProperty(kIOHIDVendorIDKey, 0x04f3, 32);
+    multitouchInterface->setProperty(kIOHIDProductIDKey, productId, 32);
+    
+    multitouchInterface->registerService();
+    
+    return true;
+    
+multitouchExit:
+    unpublishMultitouchInterface();
+    
+    return false;
+}
+
+void VoodooI2CELANTouchpadDriver::unpublishMultitouchInterface() {
+    if(multitouchInterface != NULL) {
+        multitouchInterface->stop(this);
+        multitouchInterface->release();
+        multitouchInterface = NULL;
+    }
+}
+
 void VoodooI2CELANTouchpadDriver::handleELANInput() {
     if(!readyForInput) {
         return;
@@ -375,6 +428,20 @@ void VoodooI2CELANTouchpadDriver::handleELANInput() {
     if(retVal != kIOReturnSuccess) {
         IOLog("ELAN: Failed to handle input\n");
         return;
+    }
+    
+    // Get the current timestamp
+    AbsoluteTime timestamp;
+    clock_get_uptime(&timestamp);
+    
+    // create new VoodooI2CMultitouchEvent
+    VoodooI2CMultitouchEvent event;
+    
+    //TODO: fill out the event (???)
+    
+    // send the event into the multitouch interface
+    if(multitouchInterface != NULL) {
+        multitouchInterface->handleInterruptReport(event, timestamp);
     }
 }
 
@@ -440,6 +507,8 @@ void VoodooI2CELANTouchpadDriver::releaseResources() {
 
 void VoodooI2CELANTouchpadDriver::stop(IOService* provider) {
     super::stop(provider);
+    
+    unpublishMultitouchInterface();
 }
 
 IOReturn VoodooI2CELANTouchpadDriver::setPowerState(unsigned long longpowerStateOrdinal, IOService* whatDevice) {
