@@ -11,10 +11,66 @@
 #include "VoodooI2CELANTouchpadDriver.hpp"
 #include "LinuxELANI2C.h"
 
+#define super IOService
 OSDefineMetaClassAndStructors(VoodooI2CELANTouchpadDriver, IOService);
 
+bool VoodooI2CELANTouchpadDriver::init(OSDictionary *properties) {
+    ctlRef = NULL;
+    mallocTag = NULL;
+    lockGroup = NULL;
+    lock = NULL;
+    
+    if(!super::init(properties)) {
+        return false;
+    }
+    
+    // allocate memory for the lock
+    mallocTag = OSMalloc_Tagalloc(VOODOOI2C_ELAN_CTL, OSMT_DEFAULT);
+    
+    // sanity checks
+    if(mallocTag == NULL) {
+        return false;
+    }
+    
+    lockGroup = lck_grp_alloc_init(VOODOOI2C_ELAN_CTL, LCK_GRP_ATTR_NULL);
+    if(lockGroup == NULL) {
+        return false;
+    }
+    
+    lock = lck_mtx_alloc_init(lockGroup, LCK_ATTR_NULL);
+    if(lock == NULL) {
+        return false;
+    }
+    
+    awake = true;
+    readyForInput = false;
+    
+    return true;
+}
+
+void VoodooI2CELANTouchpadDriver::free() {
+    IOLog("ELAN: free called\n");
+    super::free();
+    
+    // clean up memory for locks
+    if(lock) {
+        lck_mtx_free(lock, lockGroup);
+        lock = NULL;
+    }
+    
+    if(lockGroup) {
+        lck_grp_free(lockGroup);
+        lockGroup = NULL;
+    }
+    
+    if (mallocTag) {
+        OSMalloc_Tagfree(mallocTag);
+        mallocTag = NULL;
+    }
+}
+
 bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
-    if(!IOService::start(provider)) {
+    if(!super::start(provider)) {
         return false;
     }
     
@@ -61,6 +117,8 @@ bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
     
     IOSleep(100);
     
+    readyForInput = true;
+    
     return true;
     
 startExit:
@@ -77,7 +135,10 @@ IOReturn VoodooI2CELANTouchpadDriver::writeELANCMD(uint16_t reg, uint16_t cmd) {
     
     IOReturn retVal = kIOReturnSuccess;
     
+    lck_mtx_lock(lock);
     retVal = api->writeI2C((uint8_t *)&buffer, sizeof(buffer));
+    lck_mtx_unlock(lock);
+    
     return retVal;
 }
 
@@ -93,7 +154,9 @@ IOReturn VoodooI2CELANTouchpadDriver::readRawData(uint8_t reg, size_t len, uint8
         reg
     };
     
+    lck_mtx_lock(lock);
     retVal = api->writeReadI2C(buffer, sizeof(buffer), values, len);
+    lck_mtx_unlock(lock);
     
     return retVal;
 }
@@ -245,6 +308,7 @@ bool VoodooI2CELANTouchpadDriver::initELANDevice() {
         IOLog("ELAN: Failed to get max Y axis cmd\n");
         return false;
     }
+    
     uint16_t max_y = (*((uint16_t *)val2)) & 0x0fff;
     
     retVal = readELANCMD((uint8_t)ETP_I2C_XY_TRACENUM_CMD, val2);
@@ -252,9 +316,6 @@ bool VoodooI2CELANTouchpadDriver::initELANDevice() {
         IOLog("ELAN: Failed to get XY tracenum cmd\n");
         return false;
     }
-    
-    uint8_t x_traces = val2[0];
-    uint8_t y_traces = val2[1];
     
     retVal = readELANCMD((uint8_t)ETP_I2C_RESOLUTION_CMD, val2);
     if(retVal != kIOReturnSuccess) {
@@ -264,31 +325,26 @@ bool VoodooI2CELANTouchpadDriver::initELANDevice() {
     
     IOLog("ELAN: ProdID: %d Vers: %d Csum: %d SmVers: %d ICType: %d IAPVers: %d Max X: %d Max Y: %d\n", productId, version, ictype, csum, smvers, iapversion, max_x, max_y);
 
-    
     return true;
 }
 
 void VoodooI2CELANTouchpadDriver::interruptOccured(OSObject* owner, IOInterruptEventSource* src, int intCount) {
-    /*if (read_in_progress)
-        return;
+    IOLog("ELAN: Interrupt occurred!\n");
     if (!awake)
         return;
     
-    read_in_progress = true;
-    
     thread_t new_thread;
-    kern_return_t ret = kernel_thread_start(OSMemberFunctionCast(thread_continue_t, this, &VoodooI2CHIDDevice::getInputReport), this, &new_thread);
+    kern_return_t ret = kernel_thread_start(OSMemberFunctionCast(thread_continue_t, this, &VoodooI2CELANTouchpadDriver::handleELANInput), this, &new_thread);
     if (ret != KERN_SUCCESS){
-        read_in_progress = false;
-        IOLog("%s::%s Thread error while attempint to get input report\n", getName(), name);
+        IOLog("ELAN: Thread error while attempint to get input report\n");
     } else {
         thread_deallocate(new_thread);
-    } */
+    }
 }
 
 VoodooI2CELANTouchpadDriver* VoodooI2CELANTouchpadDriver::probe(IOService* provider, SInt32* score) {
     IOLog("ELAN: Touchpad probe!\n");
-    if(!IOService::probe(provider, score)) {
+    if(!super::probe(provider, score)) {
         return NULL;
     }
     
@@ -307,6 +363,46 @@ VoodooI2CELANTouchpadDriver* VoodooI2CELANTouchpadDriver::probe(IOService* provi
     }
    
     return this;
+}
+
+void VoodooI2CELANTouchpadDriver::handleELANInput() {
+    if(!readyForInput) {
+        return;
+    }
+    
+    uint8_t report[ETP_MAX_REPORT_LEN];
+    IOReturn retVal = readRawData(0, sizeof(report), report);
+    if(retVal != kIOReturnSuccess) {
+        IOLog("ELAN: Failed to handle input\n");
+        return;
+    }
+}
+
+void VoodooI2CELANTouchpadDriver::setELANDevicePower(bool enable) {
+    uint8_t val[2];
+    uint16_t reg;
+    
+    IOReturn error = readELANCMD((uint8_t)ETP_I2C_POWER_CMD, val);
+    if(error != kIOReturnSuccess) {
+        IOLog("ELAN: Failed to read power state\n");
+        return;
+    }
+    
+    //le16_to_cpup((__le16 *)val);
+    // Nopt sure if this is correct (ignoring little endianess here)
+    reg = val[0];
+    
+    // enable = True means turn on power
+    if (enable) {
+        reg &= ~ETP_DISABLE_POWER;
+    } else {
+        reg |= ETP_DISABLE_POWER;
+    }
+    
+    error = writeELANCMD(reg, ETP_I2C_POWER_CMD);
+    if(error != kIOReturnSuccess) {
+        IOLog("ELAN: Failed to set power state to %d\n", enable);
+    }
 }
 
 void VoodooI2CELANTouchpadDriver::releaseResources() {
@@ -343,5 +439,30 @@ void VoodooI2CELANTouchpadDriver::releaseResources() {
 }
 
 void VoodooI2CELANTouchpadDriver::stop(IOService* provider) {
-    
+    super::stop(provider);
 }
+
+IOReturn VoodooI2CELANTouchpadDriver::setPowerState(unsigned long longpowerStateOrdinal, IOService* whatDevice) {
+    if (whatDevice != this)
+        return kIOReturnInvalid;
+    if (longpowerStateOrdinal == 0){
+        if (awake){
+            awake = false;
+            
+            // Off
+            setELANDevicePower(false);
+            
+            IOLog("ELAN: Going to sleep\n");
+        }
+    } else {
+        if (!awake){
+           // On
+            setELANDevicePower(true);
+            
+            awake = true;
+            IOLog("ELAN: Woke up\n");
+        }
+    }
+    return kIOPMAckImplied;
+}
+

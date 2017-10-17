@@ -20,24 +20,21 @@
 	<string>1</string>
 	<key>IOKitPersonalities</key>
 	<dict>
-		<key>ELAN Touchpad Device</key>
+		<key>VoodooI2CHIDDevice</key>
 		<dict>
 			<key>CFBundleIdentifier</key>
 			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 			<key>IOClass</key>
 			<string>VoodooI2CELANTouchpadDriver</string>
+			<key>IOPropertyMatch</key>
+			<dict>
+				<key>compatible</key>
+				<string>PNP0C50</string>
+			</dict>
 			<key>IOProbeScore</key>
-			<integer>200</integer>
+			<integer>100</integer>
 			<key>IOProviderClass</key>
 			<string>VoodooI2CDeviceNub</string>
-			<key>IONameMatch</key>
-			<array>
-				<string>ELAN0000</string>
-				<string>ELAN0100</string>
-				<string>ELAN0600</string>
-				<string>ELAN0605</string>
-				<string>ELAN1000</string>
-			</array>
 		</dict>
 	</dict>
 	<key>NSHumanReadableCopyright</key>

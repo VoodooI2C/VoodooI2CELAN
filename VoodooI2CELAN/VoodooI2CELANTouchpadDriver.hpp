@@ -18,10 +18,26 @@
 
 #include "../../../Dependencies/helpers.hpp"
 
+#include <libkern/libkern.h>
+#include <sys/kern_control.h>
+#include <libkern/OSMalloc.h>
+
+#define VOODOOI2C_ELAN_CTL "me.kishorprins.VoodooI2CELANTouchpadDriver"
+
 class VoodooI2CELANTouchpadDriver : public IOService {
     OSDeclareDefaultStructors(VoodooI2CELANTouchpadDriver);
     VoodooI2CDeviceNub* api;
     IOACPIPlatformDevice* acpiDevice;
+    
+    bool awake;
+    bool readyForInput;
+    
+    // lock for read/writes
+    struct kern_ctl_reg ctlReg;
+    kern_ctl_ref ctlRef = NULL;
+    OSMallocTag mallocTag = NULL;
+    lck_grp_t* lockGroup;
+    lck_mtx_t* lock;
     
     IOWorkLoop* workLoop;
     IOCommandGate* commandGate;
@@ -33,10 +49,16 @@ class VoodooI2CELANTouchpadDriver : public IOService {
     IOReturn readRaw16Data(uint8_t reg, size_t len, uint8_t* values);
     bool initELANDevice();
     bool checkForASUSFirmware(uint8_t productId, uint8_t ic_type);
+    void handleELANInput();
+    void setELANDevicePower(bool enable);
     void releaseResources();
+protected:
+    virtual IOReturn setPowerState(unsigned long longpowerStateOrdinal, IOService* whatDevice) override;
 public:
     virtual bool start(IOService* provider) override;
     virtual void stop(IOService* device) override;
+    virtual bool init(OSDictionary* properties) override;
+    virtual void free() override;
     virtual VoodooI2CELANTouchpadDriver* probe(IOService* provider, SInt32* score) override;
 };
 
