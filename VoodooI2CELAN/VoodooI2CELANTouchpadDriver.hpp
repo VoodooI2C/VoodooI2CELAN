@@ -35,7 +35,7 @@ class VoodooI2CELANTouchpadDriver : public IOService {
     kern_ctl_ref ctlRef = NULL;
     OSMallocTag mallocTag = NULL;
     lck_grp_t* lockGroup;
-    lck_mtx_t* lock;
+    lck_spin_t* handleReportLock;
     
     int productId;
     
@@ -46,15 +46,16 @@ class VoodooI2CELANTouchpadDriver : public IOService {
     IOInterruptEventSource* interruptSource;
     void interruptOccured(OSObject* owner, IOInterruptEventSource* src, int intCount);
     IOReturn writeELANCMD(uint16_t reg, uint16_t cmd);
-    IOReturn readELANCMD(uint8_t reg, uint8_t* val);
+    IOReturn readELANCMD(uint16_t reg, uint8_t* val);
     IOReturn readRawData(uint8_t reg, size_t len, uint8_t* values);
-    IOReturn readRaw16Data(uint8_t reg, size_t len, uint8_t* values);
+    IOReturn readRaw16Data(uint16_t reg, size_t len, uint8_t* values);
     bool initELANDevice();
     bool checkForASUSFirmware(uint8_t productId, uint8_t ic_type);
     bool publishMultitouchInterface();
     void unpublishMultitouchInterface();
+    int filloutMultitouchEvent(uint8_t* reportData, OSArray* transducers);
     void handleELANInput();
-    void setELANDevicePower(bool enable);
+    void setELANSleepStatus(bool enable);
     void releaseResources();
 protected:
     virtual IOReturn setPowerState(unsigned long longpowerStateOrdinal, IOService* whatDevice) override;

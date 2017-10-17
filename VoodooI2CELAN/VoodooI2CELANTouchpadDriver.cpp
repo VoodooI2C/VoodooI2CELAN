@@ -20,7 +20,7 @@ bool VoodooI2CELANTouchpadDriver::init(OSDictionary *properties) {
     ctlRef = NULL;
     mallocTag = NULL;
     lockGroup = NULL;
-    lock = NULL;
+    handleReportLock = NULL;
     
     if(!super::init(properties)) {
         return false;
@@ -39,8 +39,8 @@ bool VoodooI2CELANTouchpadDriver::init(OSDictionary *properties) {
         return false;
     }
     
-    lock = lck_mtx_alloc_init(lockGroup, LCK_ATTR_NULL);
-    if(lock == NULL) {
+    handleReportLock = lck_spin_alloc_init(lockGroup, LCK_ATTR_NULL);
+    if(handleReportLock == NULL) {
         return false;
     }
     
@@ -55,9 +55,9 @@ void VoodooI2CELANTouchpadDriver::free() {
     super::free();
     
     // clean up memory for locks
-    if(lock) {
-        lck_mtx_free(lock, lockGroup);
-        lock = NULL;
+    if(handleReportLock) {
+        lck_spin_free(handleReportLock, lockGroup);
+        handleReportLock = NULL;
     }
     
     if(lockGroup) {
@@ -109,6 +109,7 @@ bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
     interruptSource->enable();
     
     PMinit();
+    
     if(!initELANDevice()) {
         goto startExit;
     }
@@ -139,39 +140,31 @@ IOReturn VoodooI2CELANTouchpadDriver::writeELANCMD(uint16_t reg, uint16_t cmd) {
     
     IOReturn retVal = kIOReturnSuccess;
     
-    lck_mtx_lock(lock);
-    retVal = api->writeI2C((uint8_t *)&buffer, sizeof(buffer));
-    lck_mtx_unlock(lock);
+    retVal = api->writeI2C((uint8_t *)buffer, sizeof(buffer));
     
     return retVal;
 }
 
 // Linux equivalent of elan_i2c_read_cmd
-IOReturn VoodooI2CELANTouchpadDriver::readELANCMD(uint8_t reg, uint8_t* val) {
+IOReturn VoodooI2CELANTouchpadDriver::readELANCMD(uint16_t reg, uint8_t* val) {
     return readRaw16Data(reg, ETP_I2C_INF_LENGTH, val);
 }
 
 IOReturn VoodooI2CELANTouchpadDriver::readRawData(uint8_t reg, size_t len, uint8_t* values) {
     IOReturn retVal= kIOReturnSuccess;
     
-    uint8_t buffer[] {
-        reg
-    };
-    
-    lck_mtx_lock(lock);
-    retVal = api->writeReadI2C(buffer, sizeof(buffer), values, len);
-    lck_mtx_unlock(lock);
+    retVal = api->writeReadI2C(&reg, 1, values, len);
     
     return retVal;
 }
 
-IOReturn VoodooI2CELANTouchpadDriver::readRaw16Data(uint8_t reg, size_t len, uint8_t* values) {
+IOReturn VoodooI2CELANTouchpadDriver::readRaw16Data(uint16_t reg, size_t len, uint8_t* values) {
     IOReturn retVal= kIOReturnSuccess;
     
     uint16_t buffer[] {
         reg
     };
-    
+   
     retVal = api->writeReadI2C((uint8_t *)&buffer, sizeof(buffer), values, len);
     
     return retVal;
@@ -190,6 +183,17 @@ bool VoodooI2CELANTouchpadDriver::checkForASUSFirmware(uint8_t productId, uint8_
     }
     
     return false;
+}
+
+void dumpArgs(uint8_t* vals, size_t len) {
+    IOLog("ELAN: Start -----\n");
+    
+    for(int i = 0; i < len; i++) {
+        IOLog("ELAN: val[%d] = %d\n", i, vals[i]);
+        IOSleep(1);
+    }
+    
+    IOLog("ELAN: Stop -----\n");
 }
 
 bool VoodooI2CELANTouchpadDriver::initELANDevice() {
@@ -214,17 +218,21 @@ bool VoodooI2CELANTouchpadDriver::initELANDevice() {
         return false;;
     }
     
-    retVal = readRawData(ETP_I2C_DESC_CMD, ETP_I2C_DESC_LENGTH, val);
+    retVal = readRaw16Data(ETP_I2C_DESC_CMD, ETP_I2C_DESC_LENGTH, val);
     if(retVal != kIOReturnSuccess) {
         IOLog("ELAN: Failed to get desc cmd\n");
         return false;
     }
     
-    retVal = readRawData(ETP_I2C_REPORT_DESC_CMD, ETP_I2C_REPORT_DESC_LENGTH, val);
+     dumpArgs(val, ETP_I2C_DESC_LENGTH);
+    
+    retVal = readRaw16Data(ETP_I2C_REPORT_DESC_CMD, ETP_I2C_REPORT_DESC_LENGTH, val);
     if(retVal != kIOReturnSuccess) {
         IOLog("ELAN: Failed to get report cmd\n");
         return false;
     }
+    
+     dumpArgs(val, ETP_I2C_REPORT_DESC_LENGTH);
     
     // get the product ID
     retVal = readELANCMD((uint8_t)ETP_I2C_UNIQUEID_CMD, val2);
@@ -361,6 +369,22 @@ VoodooI2CELANTouchpadDriver* VoodooI2CELANTouchpadDriver::probe(IOService* provi
         return NULL;
     }
     
+    // check for ELAN devices (DSDT must have ELAN* defined in the name property)
+    OSData* nameData = OSDynamicCast(OSData, provider->getProperty("name"));
+    if(nameData == NULL) {
+        IOLog("ELAN: Unable to get 'name' property\n");
+        return NULL;
+    }
+    
+    char* deviceName = (char*)nameData->getBytesNoCopy();
+    if(deviceName[0] != 'E' && deviceName[1] != 'L'
+       && deviceName[2] != 'A'&& deviceName[3] != 'N') {
+        IOLog("ELAN: ELAN device not found, instead found %s\n", deviceName);
+        return NULL;
+    }
+    
+    IOLog("ELAN: Found device name %s\n", deviceName);
+    
     api = OSDynamicCast(VoodooI2CDeviceNub, provider);
     
     if(api == NULL) {
@@ -418,13 +442,58 @@ void VoodooI2CELANTouchpadDriver::unpublishMultitouchInterface() {
     }
 }
 
+int VoodooI2CELANTouchpadDriver::filloutMultitouchEvent(uint8_t* reportData, OSArray* transducers) {
+    if(transducers == NULL) {
+        return 0;
+    }
+    
+    if(reportData[0] == 0xff) {
+        return 0;
+    }
+    
+    // Get the current timestamp
+    AbsoluteTime timestamp;
+    clock_get_uptime(&timestamp);
+    
+    uint8_t *fingerData = &reportData[ETP_FINGER_DATA_OFFSET];
+    int numFingers = 0;
+    
+    uint8_t touchInfo = reportData[ETP_TOUCH_INFO_OFFSET];
+    uint8_t hoverInfo = reportData[ETP_HOVER_INFO_OFFSET];
+    
+   // bool hoverEvent = hoverInfo & 0x40;
+    for(int i = 0; i < ETP_MAX_FINGERS; i++) {
+        VoodooI2CDigitiserTransducer* transducer = OSDynamicCast(VoodooI2CDigitiserTransducer, transducers->getObject(i));
+        
+        if(transducer == NULL) {
+            continue;
+        }
+        
+        bool contactValid = touchInfo & (1U << (3 + i));
+        if(!contactValid) {
+            continue;
+        }
+        
+        transducer->coordinates.x.update(((fingerData[0] & 0xf0) << 4) | fingerData[1], timestamp);
+        transducer->coordinates.x.update(((fingerData[0] & 0x0f) << 8) | fingerData[2], timestamp);
+        
+        transducer->physical_button.update(touchInfo & 0x01, timestamp);
+        
+        numFingers += 1;
+        fingerData += ETP_FINGER_DATA_LEN;
+        
+    }
+    
+    return numFingers;
+}
+
 void VoodooI2CELANTouchpadDriver::handleELANInput() {
     if(!readyForInput) {
         return;
     }
     
-    uint8_t report[ETP_MAX_REPORT_LEN];
-    IOReturn retVal = readRawData(0, sizeof(report), report);
+    uint8_t reportData[ETP_MAX_REPORT_LEN];
+    IOReturn retVal = readRawData(0, sizeof(reportData), reportData);
     if(retVal != kIOReturnSuccess) {
         IOLog("ELAN: Failed to handle input\n");
         return;
@@ -434,19 +503,28 @@ void VoodooI2CELANTouchpadDriver::handleELANInput() {
     AbsoluteTime timestamp;
     clock_get_uptime(&timestamp);
     
+    OSArray* transducers = OSArray::withCapacity(ETP_MAX_FINGERS);
+    int numFingers =  filloutMultitouchEvent(reportData, transducers);
+    
     // create new VoodooI2CMultitouchEvent
     VoodooI2CMultitouchEvent event;
+    event.contact_count = numFingers;
+    event.transducers = transducers;
     
     //TODO: fill out the event (???)
     
     // send the event into the multitouch interface
     if(multitouchInterface != NULL) {
-        multitouchInterface->handleInterruptReport(event, timestamp);
+        lck_spin_lock(handleReportLock);
+       // multitouchInterface->handleInterruptReport(event, timestamp);
+        lck_spin_unlock(handleReportLock);
     }
+    
+    OSSafeReleaseNULL(transducers);
 }
 
-void VoodooI2CELANTouchpadDriver::setELANDevicePower(bool enable) {
-    uint8_t val[2];
+void VoodooI2CELANTouchpadDriver::setELANSleepStatus(bool enable) {
+    /*uint8_t val[2];
     uint16_t reg;
     
     IOReturn error = readELANCMD((uint8_t)ETP_I2C_POWER_CMD, val);
@@ -469,7 +547,14 @@ void VoodooI2CELANTouchpadDriver::setELANDevicePower(bool enable) {
     error = writeELANCMD(reg, ETP_I2C_POWER_CMD);
     if(error != kIOReturnSuccess) {
         IOLog("ELAN: Failed to set power state to %d\n", enable);
+    }*/
+    
+    IOReturn retVal = writeELANCMD(ETP_I2C_STAND_CMD, enable ? ETP_I2C_SLEEP : ETP_I2C_WAKE_UP);
+    if(retVal != kIOReturnSuccess) {
+        IOLog("ELAN: Failed to set sleep status(%d)\n", enable);
     }
+    
+    IOLog("ELAN: Set sleep status to %d\n", enable);
 }
 
 void VoodooI2CELANTouchpadDriver::releaseResources() {
@@ -506,32 +591,36 @@ void VoodooI2CELANTouchpadDriver::releaseResources() {
 }
 
 void VoodooI2CELANTouchpadDriver::stop(IOService* provider) {
-    super::stop(provider);
-    
+        releaseResources();
     unpublishMultitouchInterface();
+    PMstop();
+    IOLog("ELAN: Stop called\n");
+    super::stop(provider);
+
 }
 
 IOReturn VoodooI2CELANTouchpadDriver::setPowerState(unsigned long longpowerStateOrdinal, IOService* whatDevice) {
-    if (whatDevice != this)
+    /*if (whatDevice != this)
         return kIOReturnInvalid;
     if (longpowerStateOrdinal == 0){
         if (awake){
             awake = false;
             
             // Off
-            setELANDevicePower(false);
+            setELANSleepStatus(false);
             
             IOLog("ELAN: Going to sleep\n");
         }
     } else {
         if (!awake){
            // On
-            setELANDevicePower(true);
+            setELANSleepStatus(true);
             
             awake = true;
             IOLog("ELAN: Woke up\n");
         }
-    }
-    return kIOPMAckImplied;
+    } */
+    IOLog("ELAN: set power state called\n");
+    return super::setPowerState(longpowerStateOrdinal, whatDevice);
 }
 
