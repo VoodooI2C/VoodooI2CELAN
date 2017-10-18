@@ -97,7 +97,8 @@ bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
         IOLog("ELAN: Could not open API\n");
         goto startExit;
     }
-
+    
+    // set interrupts AFTER device is initialised
     interruptSource = IOInterruptEventSource::interruptEventSource(this, OSMemberFunctionCast(IOInterruptEventAction, this, &VoodooI2CELANTouchpadDriver::interruptOccured), api, 0);
     
     if(interruptSource == NULL) {
@@ -107,12 +108,6 @@ bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
     
     workLoop->addEventSource(interruptSource);
     interruptSource->enable();
-    
-    PMinit();
-    
-    if(!initELANDevice()) {
-        goto startExit;
-    }
     
     api->joinPMtree(this);
     
@@ -139,8 +134,7 @@ IOReturn VoodooI2CELANTouchpadDriver::writeELANCMD(uint16_t reg, uint16_t cmd) {
     };
     
     IOReturn retVal = kIOReturnSuccess;
-    
-    retVal = api->writeI2C((uint8_t *)buffer, sizeof(buffer));
+    retVal = api->writeI2C((uint8_t *)&buffer, sizeof(buffer));
     
     return retVal;
 }
@@ -165,7 +159,7 @@ IOReturn VoodooI2CELANTouchpadDriver::readRaw16Data(uint16_t reg, size_t len, ui
         reg
     };
    
-    retVal = api->writeReadI2C((uint8_t *)&buffer, sizeof(buffer), values, len);
+    retVal = api->writeReadI2C((uint8_t*)buffer, sizeof(buffer), values, len);
     
     return retVal;
 }
@@ -173,8 +167,8 @@ IOReturn VoodooI2CELANTouchpadDriver::readRaw16Data(uint16_t reg, size_t len, ui
 bool VoodooI2CELANTouchpadDriver::checkForASUSFirmware(uint8_t productId, uint8_t ic_type) {
     if (ic_type == 0x0E) {
         switch (productId) {
-            case 0x05 ... 0x07: break;
-            case 0x09: break;
+            case 0x05 ... 0x07:
+            case 0x09:
             case 0x13:
                 return true;
         }
@@ -183,17 +177,6 @@ bool VoodooI2CELANTouchpadDriver::checkForASUSFirmware(uint8_t productId, uint8_
     }
     
     return false;
-}
-
-void dumpArgs(uint8_t* vals, size_t len) {
-    IOLog("ELAN: Start -----\n");
-    
-    for(int i = 0; i < len; i++) {
-        IOLog("ELAN: val[%d] = %d\n", i, vals[i]);
-        IOSleep(1);
-    }
-    
-    IOLog("ELAN: Stop -----\n");
 }
 
 bool VoodooI2CELANTouchpadDriver::initELANDevice() {
@@ -224,25 +207,22 @@ bool VoodooI2CELANTouchpadDriver::initELANDevice() {
         return false;
     }
     
-     dumpArgs(val, ETP_I2C_DESC_LENGTH);
-    
     retVal = readRaw16Data(ETP_I2C_REPORT_DESC_CMD, ETP_I2C_REPORT_DESC_LENGTH, val);
     if(retVal != kIOReturnSuccess) {
         IOLog("ELAN: Failed to get report cmd\n");
         return false;
     }
     
-     dumpArgs(val, ETP_I2C_REPORT_DESC_LENGTH);
-    
     // get the product ID
-    retVal = readELANCMD((uint8_t)ETP_I2C_UNIQUEID_CMD, val2);
+    retVal = readELANCMD(ETP_I2C_UNIQUEID_CMD, val2);
     if(retVal != kIOReturnSuccess) {
         IOLog("ELAN: Failed to get product ID cmd\n");
         return false;
     }
+    
     uint8_t productId = val2[0];
     
-    retVal = readELANCMD((uint8_t)ETP_I2C_SM_VERSION_CMD, val2);
+    retVal = readELANCMD(ETP_I2C_SM_VERSION_CMD, val2);
     if(retVal != kIOReturnSuccess) {
         IOLog("ELAN: Failed to get IC type cmd\n");
         return false;
@@ -281,41 +261,41 @@ bool VoodooI2CELANTouchpadDriver::initELANDevice() {
         }
     }
     
-    retVal = readELANCMD((uint8_t)ETP_I2C_FW_VERSION_CMD, val2);
+    retVal = readELANCMD(ETP_I2C_FW_VERSION_CMD, val2);
     if(retVal != kIOReturnSuccess) {
         IOLog("ELAN: Failed to get version cmd\n");
         return false;
     }
     uint8_t version = val2[0];
     
-    retVal = readELANCMD((uint8_t)ETP_I2C_FW_CHECKSUM_CMD, val2);
+    retVal = readELANCMD(ETP_I2C_FW_CHECKSUM_CMD, val2);
     if(retVal != kIOReturnSuccess) {
         IOLog("ELAN: Failed to get checksum cmd\n");
         return false;
     }
     uint16_t csum = *((uint16_t *)val2);
     
-    retVal = readELANCMD((uint8_t)ETP_I2C_IAP_VERSION_CMD, val2);
+    retVal = readELANCMD(ETP_I2C_IAP_VERSION_CMD, val2);
     if(retVal != kIOReturnSuccess) {
         IOLog("ELAN: Failed to get IAP version cmd\n");
         return false;
     }
     uint8_t iapversion = val2[0];
     
-    retVal = readELANCMD((uint8_t)ETP_I2C_PRESSURE_CMD, val2);
+    retVal = readELANCMD(ETP_I2C_PRESSURE_CMD, val2);
     if(retVal != kIOReturnSuccess) {
         IOLog("ELAN: Failed to get pressure cmd\n");
         return false;
     }
     
-    retVal = readELANCMD((uint8_t)ETP_I2C_MAX_X_AXIS_CMD, val2);
+    retVal = readELANCMD(ETP_I2C_MAX_X_AXIS_CMD, val2);
     if(retVal != kIOReturnSuccess) {
         IOLog("ELAN: Failed to get max X axis cmd\n");
         return false;
     }
     uint16_t max_x = (*((uint16_t *)val2)) & 0x0fff;
     
-    retVal = readELANCMD((uint8_t)ETP_I2C_MAX_Y_AXIS_CMD, val2);
+    retVal = readELANCMD(ETP_I2C_MAX_Y_AXIS_CMD, val2);
     if(retVal != kIOReturnSuccess) {
         IOLog("ELAN: Failed to get max Y axis cmd\n");
         return false;
@@ -323,13 +303,13 @@ bool VoodooI2CELANTouchpadDriver::initELANDevice() {
     
     uint16_t max_y = (*((uint16_t *)val2)) & 0x0fff;
     
-    retVal = readELANCMD((uint8_t)ETP_I2C_XY_TRACENUM_CMD, val2);
+    retVal = readELANCMD(ETP_I2C_XY_TRACENUM_CMD, val2);
     if(retVal != kIOReturnSuccess) {
         IOLog("ELAN: Failed to get XY tracenum cmd\n");
         return false;
     }
     
-    retVal = readELANCMD((uint8_t)ETP_I2C_RESOLUTION_CMD, val2);
+    retVal = readELANCMD(ETP_I2C_RESOLUTION_CMD, val2);
     if(retVal != kIOReturnSuccess) {
         IOLog("ELAN: Failed to get touchpad resolution cmd\n");
         return false;
@@ -391,6 +371,13 @@ VoodooI2CELANTouchpadDriver* VoodooI2CELANTouchpadDriver::probe(IOService* provi
         IOLog("ELAN: Could not get VoodooI2C API instance\n");
         return NULL;
     }
+    
+    PMinit();
+    
+    if(!initELANDevice()) {
+       return NULL;
+    }
+
    
     return this;
 }
