@@ -44,7 +44,7 @@ class VoodooI2CELANTouchpadDriver : public IOService {
     IOWorkLoop* workLoop;
     IOCommandGate* commandGate;
     IOInterruptEventSource* interruptSource;
-    void interruptOccured(OSObject* owner, IOInterruptEventSource* src, int intCount);
+    void interruptOccurred(OSObject* owner, IOInterruptEventSource* src, int intCount);
     IOReturn writeELANCMD(uint16_t reg, uint16_t cmd);
     IOReturn readELANCMD(uint16_t reg, uint8_t* val);
     IOReturn readRawData(uint8_t reg, size_t len, uint8_t* values);

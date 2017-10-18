@@ -99,7 +99,7 @@ bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
     }
     
     // set interrupts AFTER device is initialised
-    interruptSource = IOInterruptEventSource::interruptEventSource(this, OSMemberFunctionCast(IOInterruptEventAction, this, &VoodooI2CELANTouchpadDriver::interruptOccured), api, 0);
+    interruptSource = IOInterruptEventSource::interruptEventSource(this, OSMemberFunctionCast(IOInterruptEventAction, this, &VoodooI2CELANTouchpadDriver::interruptOccurred), api, 0);
     
     if(interruptSource == NULL) {
         IOLog("ELAN: Could not get interrupt event source\n");
@@ -322,7 +322,7 @@ bool VoodooI2CELANTouchpadDriver::initELANDevice() {
     return true;
 }
 
-void VoodooI2CELANTouchpadDriver::interruptOccured(OSObject* owner, IOInterruptEventSource* src, int intCount) {
+void VoodooI2CELANTouchpadDriver::interruptOccurred(OSObject* owner, IOInterruptEventSource* src, int intCount) {
     IOLog("ELAN: Interrupt occurred!\n");
     if (!awake)
         return;
@@ -479,8 +479,18 @@ void VoodooI2CELANTouchpadDriver::handleELANInput() {
         return;
     }
     
+    if(api == NULL) {
+        IOLog("ELAN: API is null\n");
+        
+        return;
+    }
+    
     uint8_t reportData[ETP_MAX_REPORT_LEN];
-    IOReturn retVal = readRawData(0, sizeof(reportData), reportData);
+    for(int i = 0; i < ETP_MAX_REPORT_LEN; i++) {
+        reportData[i] = 0;
+    }
+    
+    IOReturn retVal = api->readI2C(reportData, ETP_MAX_REPORT_LEN);
     if(retVal != kIOReturnSuccess) {
         IOLog("ELAN: Failed to handle input\n");
         return;
@@ -502,9 +512,9 @@ void VoodooI2CELANTouchpadDriver::handleELANInput() {
     
     // send the event into the multitouch interface
     if(multitouchInterface != NULL) {
-        lck_spin_lock(handleReportLock);
+        //lck_spin_lock(handleReportLock);
        // multitouchInterface->handleInterruptReport(event, timestamp);
-        lck_spin_unlock(handleReportLock);
+      //  lck_spin_unlock(handleReportLock);
     }
     
     OSSafeReleaseNULL(transducers);
