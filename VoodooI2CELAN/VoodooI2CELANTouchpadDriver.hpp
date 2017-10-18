@@ -35,7 +35,7 @@ class VoodooI2CELANTouchpadDriver : public IOService {
     kern_ctl_ref ctlRef = NULL;
     OSMallocTag mallocTag = NULL;
     lck_grp_t* lockGroup;
-    lck_spin_t* handleReportLock;
+    lck_mtx_t* handleReportLock;
     
     int productId;
     
