@@ -21,6 +21,7 @@ bool VoodooI2CELANTouchpadDriver::init(OSDictionary *properties) {
     mallocTag = NULL;
     lockGroup = NULL;
     handleReportLock = NULL;
+    transducers = NULL;
     
     if(!super::init(properties)) {
         return false;
@@ -42,6 +43,19 @@ bool VoodooI2CELANTouchpadDriver::init(OSDictionary *properties) {
     handleReportLock = lck_mtx_alloc_init(lockGroup, LCK_ATTR_NULL);
     if(handleReportLock == NULL) {
         return false;
+    }
+    
+    transducers = OSArray::withCapacity(ETP_MAX_FINGERS);
+    if(transducers == NULL) {
+        return false;
+    }
+    
+    // initialise the N transducers we need for tracking our N fingers
+    // we are a touchpad
+    DigitiserTransducuerType type = kDigitiserTransducerFinger;
+    for(int i = 0; i < ETP_MAX_FINGERS; i++) {
+        VoodooI2CDigitiserTransducer* transducer = VoodooI2CDigitiserTransducer::transducer(type, NULL);
+        transducers->setObject(transducer);
     }
     
     awake = true;
@@ -342,7 +356,7 @@ bool VoodooI2CELANTouchpadDriver::initELANDevice() {
 }
 
 void VoodooI2CELANTouchpadDriver::interruptOccurred(OSObject* owner, IOInterruptEventSource* src, int intCount) {
-    IOLog("ELAN: Interrupt occurred!\n");
+   // IOLog("ELAN: Interrupt occurred!\n");
     if (!awake)
         return;
     
@@ -457,27 +471,31 @@ int VoodooI2CELANTouchpadDriver::filloutMultitouchEvent(uint8_t* reportData, OSA
     
     uint8_t* finger_data = &reportData[ETP_FINGER_DATA_OFFSET];
     uint8_t tp_info = reportData[ETP_TOUCH_INFO_OFFSET];
-    uint8_t hover_info = reportData[ETP_HOVER_INFO_OFFSET];
+   // uint8_t hover_info = reportData[ETP_HOVER_INFO_OFFSET];
     
     int numFingers = 0;
     
     // we are a touchpad
-    DigitiserTransducuerType type = kDigitiserTransducerFinger;
     
     for (int i = 0; i < ETP_MAX_FINGERS; i++) {
-        VoodooI2CDigitiserTransducer* transducer = VoodooI2CDigitiserTransducer::transducer(type, NULL);
-        IOLog("ELAN: Transducer null? %d\n", transducer == NULL);
+        VoodooI2CDigitiserTransducer* transducer = OSDynamicCast(VoodooI2CDigitiserTransducer,  transducers->getObject(i));
+        //IOLog("ELAN: Transducer null? %d\n", transducer == NULL);
+        
+        if(transducer == NULL) {
+            continue;
+        }
+        
         bool contactValid = tp_info & (1U << (3 + i));
         
         if(contactValid) {
             unsigned int posX = ((finger_data[0] & 0xf0) << 4) | finger_data[1];
             unsigned int posY = ((finger_data[0] & 0x0f) << 8) | finger_data[2];
             
+            IOLog("ELAN: posX: %d, posY: %d\n", posX, posY);
+            
             transducer->coordinates.x.update(posX, timestamp);
             transducer->coordinates.y.update(posY, timestamp);
             transducer->physical_button.update(tp_info & 0x01, timestamp);
-            
-            transducers->setObject(transducer);
             
             numFingers += 1;
             finger_data += ETP_FINGER_DATA_LEN;
@@ -485,7 +503,7 @@ int VoodooI2CELANTouchpadDriver::filloutMultitouchEvent(uint8_t* reportData, OSA
     }
    
     
-    IOLog("ELAN: Num  fingers %d\n", numFingers);
+   // IOLog("ELAN: Num fingers %d\n", numFingers);
     
     return numFingers;
 }
@@ -520,7 +538,6 @@ void VoodooI2CELANTouchpadDriver::handleELANInput() {
     AbsoluteTime timestamp;
     clock_get_uptime(&timestamp);
     
-    OSArray* transducers = OSArray::withCapacity(ETP_MAX_FINGERS);
     if(transducers == NULL) {
         IOLog("ELAN: Failed to create transducers array\n");
         lck_mtx_unlock(handleReportLock);
@@ -539,22 +556,13 @@ void VoodooI2CELANTouchpadDriver::handleELANInput() {
     // send the event into the multitouch interface
     if(multitouchInterface != NULL) {
         //lck_spin_lock(handleReportLock);
-       // multitouchInterface->handleInterruptReport(event, timestamp);
+        multitouchInterface->handleInterruptReport(event, timestamp);
       //  lck_spin_unlock(handleReportLock);
     }
     
    // IOLog("ELAN: Handled data!\n");
     
     lck_mtx_unlock(handleReportLock);
-    
-    for(int i = 0; i < ETP_MAX_FINGERS; i++) {
-        VoodooI2CDigitiserTransducer* transducer = OSDynamicCast(VoodooI2CDigitiserTransducer, transducers->getObject(i));
-        if(transducer != NULL) {
-            transducer->release();
-        }
-    }
-    
-    OSSafeReleaseNULL(transducers);
 }
 
 void VoodooI2CELANTouchpadDriver::setELANSleepStatus(bool enable) {
@@ -621,6 +629,11 @@ void VoodooI2CELANTouchpadDriver::releaseResources() {
         }
         api->release();
         api = NULL;
+    }
+    
+    if(transducers != NULL) {
+        transducers->flushCollection();
+        OSSafeReleaseNULL(transducers);
     }
 }
 

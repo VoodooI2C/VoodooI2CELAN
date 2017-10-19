@@ -40,6 +40,7 @@ class VoodooI2CELANTouchpadDriver : public IOService {
     int productId;
     
     VoodooI2CMultitouchInterface *multitouchInterface;
+    OSArray* transducers;
     
     IOWorkLoop* workLoop;
     IOCommandGate* commandGate;
