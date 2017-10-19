@@ -32,7 +32,7 @@
 				<string>PNP0C50</string>
 			</dict>
 			<key>IOProbeScore</key>
-			<integer>100</integer>
+			<integer>200</integer>
 			<key>IOProviderClass</key>
 			<string>VoodooI2CDeviceNub</string>
 		</dict>

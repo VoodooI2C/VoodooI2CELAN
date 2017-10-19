@@ -26,6 +26,14 @@ class VoodooI2CELANTouchpadDriver : public IOService {
     bool awake;
     bool readyForInput;
     
+    // Hardware dimensions
+    int maxHWResolutionX;
+    int maxHWResolutionY;
+    
+    // Dimensions for reported X, Y?
+    int maxReportX;
+    int maxReportY;
+    
     int productId;
     
     VoodooI2CMultitouchInterface *multitouchInterface;

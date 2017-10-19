@@ -15,6 +15,11 @@
 OSDefineMetaClassAndStructors(VoodooI2CELANTouchpadDriver, IOService);
 
 bool VoodooI2CELANTouchpadDriver::init(OSDictionary *properties) {
+    maxHWResolutionX = 0;
+    maxHWResolutionY = 0;
+    
+    maxReportX = 0;
+    maxReportY = 0;
     transducers = NULL;
     
     if(!super::init(properties)) {
@@ -275,7 +280,7 @@ bool VoodooI2CELANTouchpadDriver::initELANDevice() {
         IOLog("ELAN: Failed to get max X axis cmd\n");
         return false;
     }
-    uint16_t max_x = (*((uint16_t *)val2)) & 0x0fff;
+    maxReportX = (*((uint16_t *)val2)) & 0x0fff;
     
     retVal = readELANCMD(ETP_I2C_MAX_Y_AXIS_CMD, val2);
     if(retVal != kIOReturnSuccess) {
@@ -283,7 +288,7 @@ bool VoodooI2CELANTouchpadDriver::initELANDevice() {
         return false;
     }
     
-    uint16_t max_y = (*((uint16_t *)val2)) & 0x0fff;
+    maxReportY = (*((uint16_t *)val2)) & 0x0fff;
     
     retVal = readELANCMD(ETP_I2C_XY_TRACENUM_CMD, val2);
     if(retVal != kIOReturnSuccess) {
@@ -297,19 +302,19 @@ bool VoodooI2CELANTouchpadDriver::initELANDevice() {
         return false;
     }
     
-    int hw_res_x = val2[0];
-    int hw_res_y = val2[1];
+    maxHWResolutionX = val2[0];
+    maxHWResolutionY = val2[1];
     
     this->productId = productId;
     
-    IOLog("ELAN: ProdID: %d Vers: %d Csum: %d SmVers: %d ICType: %d IAPVers: %d Max X: %d Max Y: %d\n", productId, version, ictype, csum, smvers, iapversion, max_x, max_y);
+    IOLog("ELAN: ProdID: %d Vers: %d Csum: %d SmVers: %d ICType: %d IAPVers: %d Max X: %d Max Y: %d\n", productId, version, ictype, csum, smvers, iapversion, maxReportX, maxReportY);
     
     if(multitouchInterface != NULL) {
-        multitouchInterface->logical_max_x = max_x;
-        multitouchInterface->logical_max_y = max_y;
+        multitouchInterface->logical_max_x = maxReportX;
+        multitouchInterface->logical_max_y = maxReportY;
         
-        multitouchInterface->physical_max_x = hw_res_x;
-        multitouchInterface->physical_max_x = hw_res_y;
+        multitouchInterface->physical_max_x = maxHWResolutionX;
+        multitouchInterface->physical_max_x = maxHWResolutionY;
     }
 
     return true;
@@ -426,7 +431,9 @@ IOReturn VoodooI2CELANTouchpadDriver::parseELANReport() {
         reportData[i] = 0;
     }
     
+   
     IOReturn retVal = api->readI2C(reportData, ETP_MAX_REPORT_LEN);
+    
     if(retVal != kIOReturnSuccess) {
         IOLog("ELAN: Failed to handle input\n");
         return retVal;
@@ -453,23 +460,34 @@ IOReturn VoodooI2CELANTouchpadDriver::parseELANReport() {
     
     for (int i = 0; i < ETP_MAX_FINGERS; i++) {
         VoodooI2CDigitiserTransducer* transducer = OSDynamicCast(VoodooI2CDigitiserTransducer,  transducers->getObject(i));
-        //IOLog("ELAN: Transducer null? %d\n", transducer == NULL);
         
         if(transducer == NULL) {
             continue;
         }
         
         bool contactValid = tp_info & (1U << (3 + i));
+        transducer->is_valid = contactValid;
         
         if(contactValid) {
             unsigned int posX = ((finger_data[0] & 0xf0) << 4) | finger_data[1];
             unsigned int posY = ((finger_data[0] & 0x0f) << 8) | finger_data[2];
             
-            IOLog("ELAN: posX: %d, posY: %d\n", posX, posY);
+            // switch to relative coords
+            posX = posX - maxReportX;
+            posY = maxReportY - posY;
+            
+            posX *= 10;
+            posY *= 10;
+            
+            posX /= maxHWResolutionX;
+            posY /= maxHWResolutionY;
             
             transducer->coordinates.x.update(posX, timestamp);
             transducer->coordinates.y.update(posY, timestamp);
             transducer->physical_button.update(tp_info & 0x01, timestamp);
+            
+            // fake HID-ness (for CSGesture)
+            transducer->tip_switch.update(1, timestamp);
             
             numFingers += 1;
             finger_data += ETP_FINGER_DATA_LEN;
@@ -565,7 +583,7 @@ void VoodooI2CELANTouchpadDriver::releaseResources() {
     }
     
     if(transducers != NULL) {
-        transducers->flushCollection();
+        //transducers->flushCollection();
         OSSafeReleaseNULL(transducers);
     }
 }
