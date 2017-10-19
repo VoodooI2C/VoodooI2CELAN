@@ -11,37 +11,13 @@
 #include "VoodooI2CELANTouchpadDriver.hpp"
 #include "LinuxELANI2C.h"
 
-#define VOODOOI2C_ELAN_CTL "me.kishorprins.VoodooI2CELANTouchpadDriver"
-
 #define super IOService
 OSDefineMetaClassAndStructors(VoodooI2CELANTouchpadDriver, IOService);
 
 bool VoodooI2CELANTouchpadDriver::init(OSDictionary *properties) {
-    ctlRef = NULL;
-    mallocTag = NULL;
-    lockGroup = NULL;
-    handleReportLock = NULL;
     transducers = NULL;
     
     if(!super::init(properties)) {
-        return false;
-    }
-    
-    // allocate memory for the lock
-    mallocTag = OSMalloc_Tagalloc(VOODOOI2C_ELAN_CTL, OSMT_DEFAULT);
-    
-    // sanity checks
-    if(mallocTag == NULL) {
-        return false;
-    }
-    
-    lockGroup = lck_grp_alloc_init(VOODOOI2C_ELAN_CTL, LCK_GRP_ATTR_NULL);
-    if(lockGroup == NULL) {
-        return false;
-    }
-    
-    handleReportLock = lck_mtx_alloc_init(lockGroup, LCK_ATTR_NULL);
-    if(handleReportLock == NULL) {
         return false;
     }
     
@@ -67,22 +43,6 @@ bool VoodooI2CELANTouchpadDriver::init(OSDictionary *properties) {
 void VoodooI2CELANTouchpadDriver::free() {
     IOLog("ELAN: free called\n");
     super::free();
-    
-    // clean up memory for locks
-    if(handleReportLock) {
-        lck_mtx_free(handleReportLock, lockGroup);
-        handleReportLock = NULL;
-    }
-    
-    if(lockGroup) {
-        lck_grp_free(lockGroup);
-        lockGroup = NULL;
-    }
-    
-    if (mallocTag) {
-        OSMalloc_Tagfree(mallocTag);
-        mallocTag = NULL;
-    }
 }
 
 bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
@@ -455,14 +415,30 @@ void VoodooI2CELANTouchpadDriver::unpublishMultitouchInterface() {
     }
 }
 
-int VoodooI2CELANTouchpadDriver::filloutMultitouchEvent(uint8_t* reportData, OSArray* transducers) {
+IOReturn VoodooI2CELANTouchpadDriver::parseELANReport() {
+    if(api == NULL) {
+        IOLog("ELAN: API is null\n");
+        return kIOReturnError;
+    }
+    
+    uint8_t reportData[ETP_MAX_REPORT_LEN];
+    for(int i = 0; i < ETP_MAX_REPORT_LEN; i++) {
+        reportData[i] = 0;
+    }
+    
+    IOReturn retVal = api->readI2C(reportData, ETP_MAX_REPORT_LEN);
+    if(retVal != kIOReturnSuccess) {
+        IOLog("ELAN: Failed to handle input\n");
+        return retVal;
+    }
+    
     if(transducers == NULL) {
-        return 0;
+        return kIOReturnBadArgument;
     }
     
     if(reportData[ETP_REPORT_ID_OFFSET] != ETP_REPORT_ID) {
         IOLog("ELAN: Invalid report (%d)", reportData[ETP_REPORT_ID_OFFSET]);
-        return 0;
+        return kIOReturnError;
     }
     
     // Get the current timestamp
@@ -474,8 +450,6 @@ int VoodooI2CELANTouchpadDriver::filloutMultitouchEvent(uint8_t* reportData, OSA
    // uint8_t hover_info = reportData[ETP_HOVER_INFO_OFFSET];
     
     int numFingers = 0;
-    
-    // we are a touchpad
     
     for (int i = 0; i < ETP_MAX_FINGERS; i++) {
         VoodooI2CDigitiserTransducer* transducer = OSDynamicCast(VoodooI2CDigitiserTransducer,  transducers->getObject(i));
@@ -503,66 +477,25 @@ int VoodooI2CELANTouchpadDriver::filloutMultitouchEvent(uint8_t* reportData, OSA
     }
    
     
-   // IOLog("ELAN: Num fingers %d\n", numFingers);
-    
-    return numFingers;
-}
-
-void VoodooI2CELANTouchpadDriver::handleELANInput() {
-    lck_mtx_lock(handleReportLock);
-    if(!readyForInput) {
-        lck_mtx_unlock(handleReportLock);
-        return;
-    }
-    
-    if(api == NULL) {
-        IOLog("ELAN: API is null\n");
-        lck_mtx_unlock(handleReportLock);
-        return;
-    }
-    
-   
-    uint8_t reportData[ETP_MAX_REPORT_LEN];
-    for(int i = 0; i < ETP_MAX_REPORT_LEN; i++) {
-        reportData[i] = 0;
-    }
-    
-    IOReturn retVal = api->readI2C(reportData, ETP_MAX_REPORT_LEN);
-    if(retVal != kIOReturnSuccess) {
-        IOLog("ELAN: Failed to handle input\n");
-        lck_mtx_unlock(handleReportLock);
-        return;
-    }
-    
-    // Get the current timestamp
-    AbsoluteTime timestamp;
-    clock_get_uptime(&timestamp);
-    
-    if(transducers == NULL) {
-        IOLog("ELAN: Failed to create transducers array\n");
-        lck_mtx_unlock(handleReportLock);
-        return;
-    }
-    
-    int numFingers =  filloutMultitouchEvent(reportData, transducers);
-    
     // create new VoodooI2CMultitouchEvent
     VoodooI2CMultitouchEvent event;
     event.contact_count = numFingers;
     event.transducers = transducers;
     
-    //TODO: fill out the event (???)
-    
     // send the event into the multitouch interface
     if(multitouchInterface != NULL) {
-        //lck_spin_lock(handleReportLock);
         multitouchInterface->handleInterruptReport(event, timestamp);
-      //  lck_spin_unlock(handleReportLock);
+    };
+    
+    return kIOReturnSuccess;
+}
+
+void VoodooI2CELANTouchpadDriver::handleELANInput() {
+    if(!readyForInput) {
+        return;
     }
     
-   // IOLog("ELAN: Handled data!\n");
-    
-    lck_mtx_unlock(handleReportLock);
+    commandGate->attemptAction(OSMemberFunctionCast(IOCommandGate::Action, this, &VoodooI2CELANTouchpadDriver::parseELANReport));
 }
 
 void VoodooI2CELANTouchpadDriver::setELANSleepStatus(bool enable) {
@@ -638,7 +571,7 @@ void VoodooI2CELANTouchpadDriver::releaseResources() {
 }
 
 void VoodooI2CELANTouchpadDriver::stop(IOService* provider) {
-        releaseResources();
+    releaseResources();
     unpublishMultitouchInterface();
     PMstop();
     IOLog("ELAN: Stop called\n");

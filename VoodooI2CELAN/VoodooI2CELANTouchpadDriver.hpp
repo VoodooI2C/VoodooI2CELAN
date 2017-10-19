@@ -18,10 +18,6 @@
 
 #include "../../../Dependencies/helpers.hpp"
 
-#include <libkern/libkern.h>
-#include <sys/kern_control.h>
-#include <libkern/OSMalloc.h>
-
 class VoodooI2CELANTouchpadDriver : public IOService {
     OSDeclareDefaultStructors(VoodooI2CELANTouchpadDriver);
     VoodooI2CDeviceNub* api;
@@ -29,13 +25,6 @@ class VoodooI2CELANTouchpadDriver : public IOService {
     
     bool awake;
     bool readyForInput;
-    
-    // lock for read/writes
-    struct kern_ctl_reg ctlReg;
-    kern_ctl_ref ctlRef = NULL;
-    OSMallocTag mallocTag = NULL;
-    lck_grp_t* lockGroup;
-    lck_mtx_t* handleReportLock;
     
     int productId;
     
@@ -54,7 +43,7 @@ class VoodooI2CELANTouchpadDriver : public IOService {
     bool checkForASUSFirmware(uint8_t productId, uint8_t ic_type);
     bool publishMultitouchInterface();
     void unpublishMultitouchInterface();
-    int filloutMultitouchEvent(uint8_t* reportData, OSArray* transducers);
+    IOReturn parseELANReport();
     void handleELANInput();
     void setELANSleepStatus(bool enable);
     void releaseResources();
