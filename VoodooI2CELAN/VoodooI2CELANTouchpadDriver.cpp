@@ -167,7 +167,7 @@ bool VoodooI2CELANTouchpadDriver::checkForASUSFirmware(uint8_t productId, uint8_
     return false;
 }
 
-bool VoodooI2CELANTouchpadDriver::initELANDevice() {
+bool VoodooI2CELANTouchpadDriver::resetELANDevice() {
     IOReturn retVal = kIOReturnSuccess;
     retVal = writeELANCMD(ETP_I2C_STAND_CMD, ETP_I2C_RESET);
     
@@ -249,6 +249,18 @@ bool VoodooI2CELANTouchpadDriver::initELANDevice() {
         }
     }
     
+    return true;
+}
+
+bool VoodooI2CELANTouchpadDriver::initELANDevice() {
+    if(!resetELANDevice()) {
+        return false;
+    }
+    
+    IOReturn retVal;
+    uint8_t val[256];
+    uint8_t val2[3];
+    
     retVal = readELANCMD(ETP_I2C_FW_VERSION_CMD, val2);
     if(retVal != kIOReturnSuccess) {
         IOLog("ELAN: Failed to get version cmd\n");
@@ -306,9 +318,7 @@ bool VoodooI2CELANTouchpadDriver::initELANDevice() {
     maxHWResolutionX = val2[0];
     maxHWResolutionY = val2[1];
     
-    this->productId = productId;
-    
-    IOLog("ELAN: ProdID: %d Vers: %d Csum: %d SmVers: %d ICType: %d IAPVers: %d Max X: %d Max Y: %d\n", productId, version, ictype, csum, smvers, iapversion, maxReportX, maxReportY);
+    IOLog("ELAN: ProdID: %d Vers: %d Csum: %d IAPVers: %d Max X: %d Max Y: %d\n", productId, version, csum, iapversion, maxReportX, maxReportY);
     
     if(multitouchInterface != NULL) {
         multitouchInterface->logical_max_x = maxReportX;
@@ -620,14 +630,15 @@ IOReturn VoodooI2CELANTouchpadDriver::setPowerState(unsigned long longpowerState
             }
             
             // Off
-            setELANSleepStatus(false);
+            //setELANSleepStatus(false);
             
             IOLog("ELAN: Going to sleep\n");
         }
     } else {
         if (!awake){
            // On
-            setELANSleepStatus(true);
+            //setELANSleepStatus(true);
+            resetELANDevice();
             
             awake = true;
             IOLog("ELAN: Woke up\n");

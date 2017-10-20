@@ -48,6 +48,7 @@ class VoodooI2CELANTouchpadDriver : public IOService {
     IOReturn readELANCMD(uint16_t reg, uint8_t* val);
     IOReturn readRawData(uint8_t reg, size_t len, uint8_t* values);
     IOReturn readRaw16Data(uint16_t reg, size_t len, uint8_t* values);
+    bool resetELANDevice();
     bool initELANDevice();
     bool checkForASUSFirmware(uint8_t productId, uint8_t ic_type);
     bool publishMultitouchInterface();
