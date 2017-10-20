@@ -25,6 +25,7 @@ class VoodooI2CELANTouchpadDriver : public IOService {
     
     bool awake;
     bool readyForInput;
+    bool readInProgress;
     
     // Hardware dimensions
     int maxHWResolutionX;

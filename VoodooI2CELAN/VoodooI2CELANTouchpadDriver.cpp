@@ -41,6 +41,7 @@ bool VoodooI2CELANTouchpadDriver::init(OSDictionary *properties) {
     
     awake = true;
     readyForInput = false;
+    readInProgress = false;
     
     return true;
 }
@@ -321,13 +322,18 @@ bool VoodooI2CELANTouchpadDriver::initELANDevice() {
 }
 
 void VoodooI2CELANTouchpadDriver::interruptOccurred(OSObject* owner, IOInterruptEventSource* src, int intCount) {
-   // IOLog("ELAN: Interrupt occurred!\n");
+    if(readInProgress)
+        return;
+    
     if (!awake)
         return;
+    
+    readInProgress = true;
     
     thread_t new_thread;
     kern_return_t ret = kernel_thread_start(OSMemberFunctionCast(thread_continue_t, this, &VoodooI2CELANTouchpadDriver::handleELANInput), this, &new_thread);
     if (ret != KERN_SUCCESS){
+        readInProgress = false;
         IOLog("ELAN: Thread error while attempint to get input report\n");
     } else {
         thread_deallocate(new_thread);
@@ -514,6 +520,7 @@ void VoodooI2CELANTouchpadDriver::handleELANInput() {
     }
     
     commandGate->attemptAction(OSMemberFunctionCast(IOCommandGate::Action, this, &VoodooI2CELANTouchpadDriver::parseELANReport));
+    readInProgress = false;
 }
 
 void VoodooI2CELANTouchpadDriver::setELANSleepStatus(bool enable) {
@@ -598,11 +605,19 @@ void VoodooI2CELANTouchpadDriver::stop(IOService* provider) {
 }
 
 IOReturn VoodooI2CELANTouchpadDriver::setPowerState(unsigned long longpowerStateOrdinal, IOService* whatDevice) {
-    /*if (whatDevice != this)
+    if (whatDevice != this)
         return kIOReturnInvalid;
     if (longpowerStateOrdinal == 0){
         if (awake){
             awake = false;
+            
+            for(;;) {
+                if(!readInProgress) {
+                    break;
+                }
+                
+                IOSleep(10);
+            }
             
             // Off
             setELANSleepStatus(false);
@@ -617,8 +632,8 @@ IOReturn VoodooI2CELANTouchpadDriver::setPowerState(unsigned long longpowerState
             awake = true;
             IOLog("ELAN: Woke up\n");
         }
-    } */
-    IOLog("ELAN: set power state called\n");
-    return super::setPowerState(longpowerStateOrdinal, whatDevice);
+    }
+    
+    return kIOPMAckImplied;
 }
 
