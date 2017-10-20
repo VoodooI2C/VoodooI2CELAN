@@ -533,40 +533,6 @@ void VoodooI2CELANTouchpadDriver::handleELANInput() {
     readInProgress = false;
 }
 
-void VoodooI2CELANTouchpadDriver::setELANSleepStatus(bool enable) {
-    /*uint8_t val[2];
-    uint16_t reg;
-    
-    IOReturn error = readELANCMD((uint8_t)ETP_I2C_POWER_CMD, val);
-    if(error != kIOReturnSuccess) {
-        IOLog("ELAN: Failed to read power state\n");
-        return;
-    }
-    
-    //le16_to_cpup((__le16 *)val);
-    // Nopt sure if this is correct (ignoring little endianess here)
-    reg = val[0];
-    
-    // enable = True means turn on power
-    if (enable) {
-        reg &= ~ETP_DISABLE_POWER;
-    } else {
-        reg |= ETP_DISABLE_POWER;
-    }
-    
-    error = writeELANCMD(reg, ETP_I2C_POWER_CMD);
-    if(error != kIOReturnSuccess) {
-        IOLog("ELAN: Failed to set power state to %d\n", enable);
-    }*/
-    
-    IOReturn retVal = writeELANCMD(ETP_I2C_STAND_CMD, enable ? ETP_I2C_SLEEP : ETP_I2C_WAKE_UP);
-    if(retVal != kIOReturnSuccess) {
-        IOLog("ELAN: Failed to set sleep status(%d)\n", enable);
-    }
-    
-    IOLog("ELAN: Set sleep status to %d\n", enable);
-}
-
 void VoodooI2CELANTouchpadDriver::releaseResources() {
     if (commandGate != NULL) {
         workLoop->removeEventSource(commandGate);
@@ -600,6 +566,12 @@ void VoodooI2CELANTouchpadDriver::releaseResources() {
     }
     
     if(transducers != NULL) {
+        for(int i = 0; i < transducers->getCount(); i++) {
+            OSObject* object = transducers->getObject(i);
+            if(object != NULL) {
+                object->release();
+            }
+        }
         //transducers->flushCollection();
         OSSafeReleaseNULL(transducers);
     }
