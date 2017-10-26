@@ -115,24 +115,24 @@ startExit:
 }
 
 // Linux equivalent of elan_i2c_write_cmd function
-IOReturn VoodooI2CELANTouchpadDriver::writeELANCMD(uint16_t reg, uint16_t cmd) {
-    uint16_t buffer[] {
+IOReturn VoodooI2CELANTouchpadDriver::writeELANCMD(UInt16 reg, UInt16 cmd) {
+    UInt16 buffer[] {
         reg,
         cmd
     };
     
     IOReturn retVal = kIOReturnSuccess;
-    retVal = api->writeI2C((uint8_t *)&buffer, sizeof(buffer));
+    retVal = api->writeI2C((UInt8 *)&buffer, sizeof(buffer));
     
     return retVal;
 }
 
 // Linux equivalent of elan_i2c_read_cmd
-IOReturn VoodooI2CELANTouchpadDriver::readELANCMD(uint16_t reg, uint8_t* val) {
+IOReturn VoodooI2CELANTouchpadDriver::readELANCMD(UInt16 reg, UInt8* val) {
     return readRaw16Data(reg, ETP_I2C_INF_LENGTH, val);
 }
 
-IOReturn VoodooI2CELANTouchpadDriver::readRawData(uint8_t reg, size_t len, uint8_t* values) {
+IOReturn VoodooI2CELANTouchpadDriver::readRawData(UInt8 reg, size_t len, UInt8* values) {
     IOReturn retVal= kIOReturnSuccess;
     
     retVal = api->writeReadI2C(&reg, 1, values, len);
@@ -140,19 +140,19 @@ IOReturn VoodooI2CELANTouchpadDriver::readRawData(uint8_t reg, size_t len, uint8
     return retVal;
 }
 
-IOReturn VoodooI2CELANTouchpadDriver::readRaw16Data(uint16_t reg, size_t len, uint8_t* values) {
+IOReturn VoodooI2CELANTouchpadDriver::readRaw16Data(UInt16 reg, size_t len, UInt8* values) {
     IOReturn retVal= kIOReturnSuccess;
     
-    uint16_t buffer[] {
+    UInt16 buffer[] {
         reg
     };
    
-    retVal = api->writeReadI2C((uint8_t*)buffer, sizeof(buffer), values, len);
+    retVal = api->writeReadI2C((UInt8*)buffer, sizeof(buffer), values, len);
     
     return retVal;
 }
 
-bool VoodooI2CELANTouchpadDriver::checkForASUSFirmware(uint8_t productId, uint8_t ic_type) {
+bool VoodooI2CELANTouchpadDriver::checkForASUSFirmware(UInt8 productId, UInt8 ic_type) {
     if (ic_type == 0x0E) {
         switch (productId) {
             case 0x05 ... 0x07:
@@ -180,8 +180,8 @@ bool VoodooI2CELANTouchpadDriver::resetELANDevice() {
     IOSleep(100);
     
     // get reset acknowledgement 0000
-    uint8_t val[256];
-    uint8_t val2[3];
+    UInt8 val[256];
+    UInt8 val2[3];
     retVal = readRawData(0x00, ETP_I2C_INF_LENGTH, val);
     
     if(retVal != kIOReturnSuccess) {
@@ -208,7 +208,7 @@ bool VoodooI2CELANTouchpadDriver::resetELANDevice() {
         return false;
     }
     
-    uint8_t productId = val2[0];
+    UInt8 productId = val2[0];
     
     retVal = readELANCMD(ETP_I2C_SM_VERSION_CMD, val2);
     if(retVal != kIOReturnSuccess) {
@@ -216,8 +216,8 @@ bool VoodooI2CELANTouchpadDriver::resetELANDevice() {
         return false;
     }
     
-    uint8_t smvers = val2[0];
-    uint8_t ictype = val2[1];
+    UInt8 smvers = val2[0];
+    UInt8 ictype = val2[1];
     
     if(checkForASUSFirmware(productId, ictype)) {
         IOLog("ELAN: Buggy ASUS trackpad detected\n");
@@ -258,29 +258,29 @@ bool VoodooI2CELANTouchpadDriver::initELANDevice() {
     }
     
     IOReturn retVal;
-    uint8_t val[256];
-    uint8_t val2[3];
+    UInt8 val[256];
+    UInt8 val2[3];
     
     retVal = readELANCMD(ETP_I2C_FW_VERSION_CMD, val2);
     if(retVal != kIOReturnSuccess) {
         IOLog("ELAN: Failed to get version cmd\n");
         return false;
     }
-    uint8_t version = val2[0];
+    UInt8 version = val2[0];
     
     retVal = readELANCMD(ETP_I2C_FW_CHECKSUM_CMD, val2);
     if(retVal != kIOReturnSuccess) {
         IOLog("ELAN: Failed to get checksum cmd\n");
         return false;
     }
-    uint16_t csum = *((uint16_t *)val2);
+    UInt16 csum = *((UInt16 *)val2);
     
     retVal = readELANCMD(ETP_I2C_IAP_VERSION_CMD, val2);
     if(retVal != kIOReturnSuccess) {
         IOLog("ELAN: Failed to get IAP version cmd\n");
         return false;
     }
-    uint8_t iapversion = val2[0];
+    UInt8 iapversion = val2[0];
     
     retVal = readELANCMD(ETP_I2C_PRESSURE_CMD, val2);
     if(retVal != kIOReturnSuccess) {
@@ -293,7 +293,7 @@ bool VoodooI2CELANTouchpadDriver::initELANDevice() {
         IOLog("ELAN: Failed to get max X axis cmd\n");
         return false;
     }
-    maxReportX = (*((uint16_t *)val2)) & 0x0fff;
+    maxReportX = (*((UInt16 *)val2)) & 0x0fff;
     
     retVal = readELANCMD(ETP_I2C_MAX_Y_AXIS_CMD, val2);
     if(retVal != kIOReturnSuccess) {
@@ -301,7 +301,7 @@ bool VoodooI2CELANTouchpadDriver::initELANDevice() {
         return false;
     }
     
-    maxReportY = (*((uint16_t *)val2)) & 0x0fff;
+    maxReportY = (*((UInt16 *)val2)) & 0x0fff;
     
     retVal = readELANCMD(ETP_I2C_XY_TRACENUM_CMD, val2);
     if(retVal != kIOReturnSuccess) {
@@ -442,13 +442,23 @@ IOReturn VoodooI2CELANTouchpadDriver::parseELANReport() {
         return kIOReturnError;
     }
     
-    uint8_t reportData[ETP_MAX_REPORT_LEN];
+    UInt8 reportData[ETP_MAX_REPORT_LEN];
     for(int i = 0; i < ETP_MAX_REPORT_LEN; i++) {
         reportData[i] = 0;
     }
     
-   
-    IOReturn retVal = api->readI2C(reportData, ETP_MAX_REPORT_LEN);
+    IOReturn retVal = readRawData(0, sizeof(reportData), reportData);
+    
+    if(retVal == kIOReturnBadArgument) {
+        IOLog("ELAN: Bad argument when reading input\n");
+    } else if(retVal == kIOReturnAborted) {
+        IOLog("ELAN: Aborted when reading input\n");
+    } else if(retVal == kIOReturnCannotLock) {
+        IOLog("ELAN: Cannot acquire command gate lock when reading input\n");
+    } else if(retVal == kIOReturnNotPermitted) {
+        IOLog("ELAN: Aborted when reading input\n");
+    }
+
     
     if(retVal != kIOReturnSuccess) {
         IOLog("ELAN: Failed to handle input\n");
@@ -468,9 +478,9 @@ IOReturn VoodooI2CELANTouchpadDriver::parseELANReport() {
     AbsoluteTime timestamp;
     clock_get_uptime(&timestamp);
     
-    uint8_t* finger_data = &reportData[ETP_FINGER_DATA_OFFSET];
-    uint8_t tp_info = reportData[ETP_TOUCH_INFO_OFFSET];
-   // uint8_t hover_info = reportData[ETP_HOVER_INFO_OFFSET];
+    UInt8* finger_data = &reportData[ETP_FINGER_DATA_OFFSET];
+    UInt8 tp_info = reportData[ETP_TOUCH_INFO_OFFSET];
+   // UInt8 hover_info = reportData[ETP_HOVER_INFO_OFFSET];
     
     int numFingers = 0;
     
