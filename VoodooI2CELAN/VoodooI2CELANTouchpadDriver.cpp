@@ -498,15 +498,7 @@ IOReturn VoodooI2CELANTouchpadDriver::parseELANReport() {
             unsigned int posX = ((finger_data[0] & 0xf0) << 4) | finger_data[1];
             unsigned int posY = ((finger_data[0] & 0x0f) << 8) | finger_data[2];
             
-            // switch to relative coords
-            posX = posX - maxReportX;
-            posY = maxReportY - posY;
-            
-            posX *= 10;
-            posY *= 10;
-            
-            posX /= maxHWResolutionX;
-            posY /= maxHWResolutionY;
+            posY *= -1;
             
             transducer->coordinates.x.update(posX, timestamp);
             transducer->coordinates.y.update(posY, timestamp);
