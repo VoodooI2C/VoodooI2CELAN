@@ -20,45 +20,51 @@
 
 class VoodooI2CELANTouchpadDriver : public IOService {
     OSDeclareDefaultStructors(VoodooI2CELANTouchpadDriver);
+    
     VoodooI2CDeviceNub* api;
     IOACPIPlatformDevice* acpi_device;
+    
     bool awake;
-    bool ready_for_input;
     bool read_in_progress;
+    bool ready_for_input;
+    
     int max_hw_resx;
     int max_hw_resy;
     int max_report_x;
     int max_report_y;
+    
     int product_id;
+    
+    IOCommandGate* command_gate;
+    IOInterruptEventSource* interrupt_source;
     VoodooI2CMultitouchInterface *mt_interface;
     OSArray* transducers;
     IOWorkLoop* workLoop;
-    IOCommandGate* command_gate;
-    IOInterruptEventSource* interrupt_source;
-    void interruptOccurred(OSObject* owner, IOInterruptEventSource* src, int intCount);
-    IOReturn write_ELAN_cmd(UInt16 reg, UInt16 cmd);
-    IOReturn read_ELAN_cmd(UInt16 reg, UInt8* val);
-    IOReturn read_raw_data(UInt8 reg, size_t len, UInt8* values);
-    IOReturn read_raw_16bit_data(UInt16 reg, size_t len, UInt8* values);
-    bool reset_device();
-    bool init_device();
+    
     bool check_ASUS_firmware(UInt8 productId, UInt8 ic_type);
-    bool publish_multitouch_interface();
-    void unpublish_multitouch_interface();
-    IOReturn parse_ELAN_report();
     void handle_input_threaded();
-    void set_sleep_status(bool enable);
+    bool init_device();
+    void interrupt_occurred(OSObject* owner, IOInterruptEventSource* src, int intCount);
+    IOReturn parse_ELAN_report();
+    bool publish_multitouch_interface();
+    IOReturn read_ELAN_cmd(UInt16 reg, UInt8* val);
+    IOReturn read_raw_16bit_data(UInt16 reg, size_t len, UInt8* values);
+    IOReturn read_raw_data(UInt8 reg, size_t len, UInt8* values);
     void release_resources();
+    bool reset_device();
+    void set_sleep_status(bool enable);
+    void unpublish_multitouch_interface();
+    IOReturn write_ELAN_cmd(UInt16 reg, UInt16 cmd);
 
  protected:
-        IOReturn setPowerState(unsigned long longpowerStateOrdinal, IOService* whatDevice) override;
+    IOReturn setPowerState(unsigned long longpowerStateOrdinal, IOService* whatDevice) override;
 
  public:
-    bool start(IOService* provider) override;
-    void stop(IOService* device) override;
     bool init(OSDictionary* properties) override;
     void free() override;
     VoodooI2CELANTouchpadDriver* probe(IOService* provider, SInt32* score) override;
+    bool start(IOService* provider) override;
+    void stop(IOService* device) override;
 };
 
 #endif /* VOODOOI2C_ELAN_TOUCHPAD_DRIVER_HPP */
