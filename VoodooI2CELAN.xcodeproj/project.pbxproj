@@ -18,7 +18,7 @@
 		7B30D6A31F91262100190488 /* VoodooI2CELANTouchpadDriver.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = VoodooI2CELANTouchpadDriver.hpp; sourceTree = "<group>"; };
 		7B30D6AA1F9151AE00190488 /* Kernel.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Kernel.framework; path = System/Library/Frameworks/Kernel.framework; sourceTree = SDKROOT; };
 		7B30D6AC1F9151B300190488 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
-		7B5723661F927D1400A672B5 /* LinuxELANI2C.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LinuxELANI2C.h; sourceTree = "<group>"; };
+		7B5723661F927D1400A672B5 /* VoodooI2CElanConstants.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = VoodooI2CElanConstants.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -55,7 +55,7 @@
 				7B30D68E1F910BAB00190488 /* Info.plist */,
 				7B30D6A21F91262100190488 /* VoodooI2CELANTouchpadDriver.cpp */,
 				7B30D6A31F91262100190488 /* VoodooI2CELANTouchpadDriver.hpp */,
-				7B5723661F927D1400A672B5 /* LinuxELANI2C.h */,
+				7B5723661F927D1400A672B5 /* VoodooI2CElanConstants.h */,
 			);
 			path = VoodooI2CELAN;
 			sourceTree = "<group>";
