@@ -120,7 +120,7 @@ bool VoodooI2CELANTouchpadDriver::init_device() {
     max_hw_resx = val[0];
     max_hw_resy = val[1];
     IOLog("%s::%s ProdID: %d Vers: %d Csum: %d IAPVers: %d Max X: %d Max Y: %d\n", getName(), device_name, product_id, version, csum, iapversion, max_report_x, max_report_y);
-    if (mt_interface != NULL) {
+    if (mt_interface) {
         mt_interface->logical_max_x = max_report_x;
         mt_interface->logical_max_y = max_report_y;
         mt_interface->physical_max_x = max_hw_resx;
@@ -159,7 +159,7 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
         IOLog("%s::%s Failed to handle input\n", getName(), device_name);
         return retVal;
     }
-    if (transducers == NULL) {
+    if (!transducers) {
         return kIOReturnBadArgument;
     }
     if (reportData[ETP_REPORT_ID_OFFSET] != ETP_REPORT_ID) {
@@ -212,18 +212,18 @@ VoodooI2CELANTouchpadDriver* VoodooI2CELANTouchpadDriver::probe(IOService* provi
         return NULL;
     }
     // check for ELAN devices (DSDT must have ELAN* defined in the name property)
-    OSData* nameData = OSDynamicCast(OSData, provider->getProperty("name"));
-    if (nameData == NULL) {
+    OSData* name_data = OSDynamicCast(OSData, provider->getProperty("name"));
+    if (!name_data) {
         IOLog("%s::%s Unable to get 'name' property\n", getName(), elan_name);
         return NULL;
     }
-    const char* deviceName = reinterpret_cast<char*>(const_cast<void*>(nameData->getBytesNoCopy()));
-    if (deviceName[0] != 'E' && deviceName[1] != 'L'
-        && deviceName[2] != 'A'&& deviceName[3] != 'N') {
-        IOLog("%s::%s ELAN device not found, instead found %s\n", getName(), elan_name, deviceName);
+    const char* acpi_name = reinterpret_cast<char*>(const_cast<void*>(name_data->getBytesNoCopy()));
+    if (acpi_name[0] != 'E' && acpi_name[1] != 'L'
+        && acpi_name[2] != 'A'&& acpi_name[3] != 'N') {
+        IOLog("%s::%s ELAN device not found, instead found %s\n", getName(), elan_name, acpi_name);
         return NULL;
     }
-    strncpy(device_name, deviceName, 10);
+    strncpy(device_name, acpi_name, 10);
     IOLog("%s::%s ELAN device not found, instead found %s\n", getName(), elan_name, device_name);
     api = OSDynamicCast(VoodooI2CDeviceNub, provider);
     if (!api) {
@@ -235,21 +235,21 @@ VoodooI2CELANTouchpadDriver* VoodooI2CELANTouchpadDriver::probe(IOService* provi
 
 bool VoodooI2CELANTouchpadDriver::publish_multitouch_interface() {
     mt_interface = new VoodooI2CMultitouchInterface();
-    if (mt_interface == NULL) {
+    if (!mt_interface) {
         IOLog("%s::%s No memory to allocate VoodooI2CMultitouchInterface instance\n", getName(), device_name);
-        goto multitouchExit;
+        goto multitouch_exit;
     }
     if (!mt_interface->init(NULL)) {
         IOLog("%s::%s Failed to init multitouch interface\n", getName(), device_name);
-        goto multitouchExit;
+        goto multitouch_exit;
     }
     if (!mt_interface->attach(this)) {
         IOLog("%s::%s Failed to attach multitouch interface\n", getName(), device_name);
-        goto multitouchExit;
+        goto multitouch_exit;
     }
     if (!mt_interface->start(this)) {
         IOLog("%s::%s Failed to start multitouch interface\n", getName(), device_name);
-        goto multitouchExit;
+        goto multitouch_exit;
     }
     // Assume we are a touchpad
     mt_interface->setProperty(kIOHIDDisplayIntegratedKey, true);
@@ -258,7 +258,7 @@ bool VoodooI2CELANTouchpadDriver::publish_multitouch_interface() {
     mt_interface->setProperty(kIOHIDProductIDKey, product_id, 32);
     mt_interface->registerService();
     return true;
-multitouchExit:
+multitouch_exit:
     unpublish_multitouch_interface();
     return false;
 }
@@ -354,7 +354,7 @@ void VoodooI2CELANTouchpadDriver::release_resources() {
         command_gate->release();
         command_gate = NULL;
     }
-    if (interrupt_source != NULL) {
+    if (interrupt_source) {
         interrupt_source->disable();
         workLoop->removeEventSource(interrupt_source);
         interrupt_source->release();
