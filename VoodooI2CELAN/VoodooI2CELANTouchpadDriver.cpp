@@ -54,7 +54,7 @@ bool VoodooI2CELANTouchpadDriver::init(OSDictionary *properties) {
     if (!transducers) {
         return false;
     }
-    DigitiserTransducuerType type = kDigitiserTransducerFinger;
+    DigitiserTransducerType type = kDigitiserTransducerFinger;
     for (int i = 0; i < ETP_MAX_FINGERS; i++) {
         VoodooI2CDigitiserTransducer* transducer = VoodooI2CDigitiserTransducer::transducer(type, NULL);
         transducers->setObject(transducer);
