@@ -65,11 +65,6 @@ private:
     char device_name[10];
     char elan_name[5];
     
-    int max_hw_resx;
-    int max_hw_resy;
-    int max_report_x;
-    int max_report_y;
-    
     int product_id;
     
     IOCommandGate* command_gate;
