@@ -42,10 +42,6 @@ void VoodooI2CELANTouchpadDriver::handle_input_threaded() {
 }
 
 bool VoodooI2CELANTouchpadDriver::init(OSDictionary *properties) {
-    max_hw_resx = 0;
-    max_hw_resy = 0;
-    max_report_x = 0;
-    max_report_y = 0;
     transducers = NULL;
     if (!super::init(properties)) {
         return false;
@@ -72,6 +68,10 @@ bool VoodooI2CELANTouchpadDriver::init_device() {
     }
     IOReturn retVal;
     UInt8 val[3];
+    
+    UInt32 max_report_x = 0;
+    UInt32 max_report_y = 0;
+
     retVal = read_ELAN_cmd(ETP_I2C_FW_VERSION_CMD, val);
     if (retVal != kIOReturnSuccess) {
         IOLog("%s::%s Failed to get version cmd\n", getName(), device_name);
@@ -101,12 +101,14 @@ bool VoodooI2CELANTouchpadDriver::init_device() {
         return false;
     }
     max_report_x = (*(reinterpret_cast<UInt16 *>(val))) & 0x0fff;
+
     retVal = read_ELAN_cmd(ETP_I2C_MAX_Y_AXIS_CMD, val);
     if (retVal != kIOReturnSuccess) {
         IOLog("%s::%s Failed to get max Y axis cmd\n", getName(), device_name);
         return false;
     }
     max_report_y = (*(reinterpret_cast<UInt16 *>(val))) & 0x0fff;
+
     retVal = read_ELAN_cmd(ETP_I2C_XY_TRACENUM_CMD, val);
     if (retVal != kIOReturnSuccess) {
         IOLog("%s::%s Failed to get XY tracenum cmd\n", getName(), device_name);
@@ -117,14 +119,19 @@ bool VoodooI2CELANTouchpadDriver::init_device() {
         
         return false;
     }
-    max_hw_resx = val[0];
-    max_hw_resy = val[1];
+    UInt32 hw_res_x = val[0];
+    UInt32 hw_res_y = val[1];
+
+    hw_res_x = (hw_res_x * 10 + 790) * 10 / 254;
+    hw_res_y = (hw_res_y * 10 + 790) * 10 / 254;
+
     IOLog("%s::%s ProdID: %d Vers: %d Csum: %d IAPVers: %d Max X: %d Max Y: %d\n", getName(), device_name, product_id, version, csum, iapversion, max_report_x, max_report_y);
     if (mt_interface) {
+        mt_interface->physical_max_x = max_report_x * 10 / hw_res_x;
+        mt_interface->physical_max_y = max_report_y * 10 / hw_res_y;
         mt_interface->logical_max_x = max_report_x;
         mt_interface->logical_max_y = max_report_y;
-        mt_interface->physical_max_x = max_hw_resx;
-        mt_interface->physical_max_x = max_hw_resy;
+        IOLog("phyx: %d, phyy: %d, resx: %d, resy: %d\n", mt_interface->physical_max_x, mt_interface->physical_max_y, mt_interface->logical_max_x, mt_interface->logical_max_y);
     }
     return true;
 }
@@ -256,7 +263,6 @@ bool VoodooI2CELANTouchpadDriver::publish_multitouch_interface() {
     // 0x04f3 is Elan's Vendor Id
     mt_interface->setProperty(kIOHIDVendorIDKey, 0x04f3, 32);
     mt_interface->setProperty(kIOHIDProductIDKey, product_id, 32);
-    mt_interface->registerService();
     return true;
 multitouch_exit:
     unpublish_multitouch_interface();
@@ -313,14 +319,14 @@ bool VoodooI2CELANTouchpadDriver::reset_device() {
         IOLog("%s::%s Failed to get product ID cmd\n", getName(), device_name);
         return false;
     }
-    UInt8 productId = val2[0];
+    product_id = val2[0];
     retVal = read_ELAN_cmd(ETP_I2C_SM_VERSION_CMD, val2);
     if (retVal != kIOReturnSuccess) {
         IOLog("%s::%s Failed to get IC type cmd\n", getName(), device_name);
         return false;
     }
     UInt8 ictype = val2[1];
-    if (check_ASUS_firmware(productId, ictype)) {
+    if (check_ASUS_firmware(product_id, ictype)) {
         IOLog("%s::%s ASUS trackpad detected, applying workaround\n", getName(), device_name);
         retVal = write_ELAN_cmd(ETP_I2C_STAND_CMD, ETP_I2C_WAKE_UP);
         if (retVal != kIOReturnSuccess) {
@@ -451,6 +457,8 @@ bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
     ready_for_input = true;
     setProperty("VoodooI2CServices Supported", OSBoolean::withBoolean(true));
     IOLog("%s::%s VoodooI2CELAN has started\n", getName(), elan_name);
+    mt_interface->registerService();
+    registerService();
     return true;
 start_exit:
     release_resources();
