@@ -131,7 +131,6 @@ bool VoodooI2CELANTouchpadDriver::init_device() {
         mt_interface->physical_max_y = max_report_y * 10 / hw_res_y;
         mt_interface->logical_max_x = max_report_x;
         mt_interface->logical_max_y = max_report_y;
-        IOLog("phyx: %d, phyy: %d, resx: %d, resy: %d\n", mt_interface->physical_max_x, mt_interface->physical_max_y, mt_interface->logical_max_x, mt_interface->logical_max_y);
     }
     return true;
 }
