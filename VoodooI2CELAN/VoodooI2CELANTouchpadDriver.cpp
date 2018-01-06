@@ -258,7 +258,7 @@ bool VoodooI2CELANTouchpadDriver::publish_multitouch_interface() {
         goto multitouch_exit;
     }
     // Assume we are a touchpad
-    mt_interface->setProperty(kIOHIDDisplayIntegratedKey, true);
+    mt_interface->setProperty(kIOHIDDisplayIntegratedKey, false);
     // 0x04f3 is Elan's Vendor Id
     mt_interface->setProperty(kIOHIDVendorIDKey, 0x04f3, 32);
     mt_interface->setProperty(kIOHIDProductIDKey, product_id, 32);
