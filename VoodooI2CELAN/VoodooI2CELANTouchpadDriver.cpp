@@ -188,10 +188,16 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
             unsigned int posX = ((finger_data[0] & 0xf0) << 4) | finger_data[1];
             unsigned int posY = ((finger_data[0] & 0x0f) << 8) | finger_data[2];
             posY *= -1;
+            if(mt_interface) {
+                transducer->logical_max_x = mt_interface->logical_max_x;
+                transducer->logical_max_y = mt_interface->logical_max_y;
+            }
             transducer->coordinates.x.update(posX, timestamp);
             transducer->coordinates.y.update(posY, timestamp);
             transducer->physical_button.update(tp_info & 0x01, timestamp);
             transducer->tip_switch.update(1, timestamp);
+            transducer->id = i;
+            transducer->secondary_id = i;
             numFingers += 1;
             finger_data += ETP_FINGER_DATA_LEN;
         }
@@ -230,7 +236,7 @@ VoodooI2CELANTouchpadDriver* VoodooI2CELANTouchpadDriver::probe(IOService* provi
         return NULL;
     }
     strncpy(device_name, acpi_name, 10);
-    IOLog("%s::%s ELAN device not found, instead found %s\n", getName(), elan_name, device_name);
+    IOLog("%s::%s ELAN device found (%s)\n", getName(), elan_name, device_name);
     api = OSDynamicCast(VoodooI2CDeviceNub, provider);
     if (!api) {
         IOLog("%s::%s Could not get VoodooI2C API instance\n", getName(), device_name);
