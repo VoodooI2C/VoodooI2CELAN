@@ -187,10 +187,10 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
         if (contactValid) {
             unsigned int posX = ((finger_data[0] & 0xf0) << 4) | finger_data[1];
             unsigned int posY = ((finger_data[0] & 0x0f) << 8) | finger_data[2];
-            posY *= -1;
             if(mt_interface) {
                 transducer->logical_max_x = mt_interface->logical_max_x;
                 transducer->logical_max_y = mt_interface->logical_max_y;
+                posY = transducer->logical_max_y - posY - 65535;
             }
             transducer->coordinates.x.update(posX, timestamp);
             transducer->coordinates.y.update(posY, timestamp);
@@ -200,6 +200,11 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
             transducer->secondary_id = i;
             numFingers += 1;
             finger_data += ETP_FINGER_DATA_LEN;
+        } else {
+            transducer->id = i;
+            transducer->secondary_id = i;
+            transducer->tip_switch.update(0, timestamp);
+            numFingers += 1;
         }
     }
     // create new VoodooI2CMultitouchEvent
