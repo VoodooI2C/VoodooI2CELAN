@@ -65,6 +65,7 @@ private:
     char device_name[10];
     char elan_name[5];
     
+    int pressure_adjustment;
     int product_id;
     
     IOCommandGate* command_gate;
