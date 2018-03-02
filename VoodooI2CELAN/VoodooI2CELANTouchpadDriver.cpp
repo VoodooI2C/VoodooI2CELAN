@@ -183,6 +183,7 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
     int numFingers = 0;
     for (int i = 0; i < ETP_MAX_FINGERS; i++) {
         VoodooI2CDigitiserTransducer* transducer = OSDynamicCast(VoodooI2CDigitiserTransducer,  transducers->getObject(i));
+        transducer->type = kDigitiserTransducerFinger;
         if (!transducer) {
             continue;
         }
@@ -216,11 +217,10 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
             transducer->coordinates.y.update(posY, timestamp);
             transducer->physical_button.update(tp_info & 0x01, timestamp);
             transducer->tip_switch.update(1, timestamp);
-            transducer->touch_major.update(major, timestamp);
-            transducer->touch_minor.update(minor, timestamp);
             transducer->id = i;
             transducer->secondary_id = i;
-            transducer->tip_pressure.update(pressure, timestamp);
+            //transducer->pressure_physical_max = ETP_MAX_PRESSURE;
+            //transducer->tip_pressure.update(pressure, timestamp);
             numFingers += 1;
             finger_data += ETP_FINGER_DATA_LEN;
         } else {
@@ -230,10 +230,8 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
             transducer->coordinates.y.update(transducer->coordinates.y.last.value, timestamp);
             transducer->physical_button.update(0, timestamp);
             transducer->tip_switch.update(0, timestamp);
-            transducer->tip_pressure.update(0, timestamp);
-            transducer->touch_major.update(0, timestamp);
-            transducer->touch_minor.update(0, timestamp);
-            numFingers += 1;
+            //transducer->pressure_physical_max = ETP_MAX_PRESSURE;
+            //transducer->tip_pressure.update(0, timestamp);
         }
     }
     // create new VoodooI2CMultitouchEvent
