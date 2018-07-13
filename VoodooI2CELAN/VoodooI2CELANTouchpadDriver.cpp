@@ -176,8 +176,21 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
         IOLog("%s::%s Invalid report (%d)\n", getName(), device_name, reportData[ETP_REPORT_ID_OFFSET]);
         return kIOReturnError;
     }
+    
+    // Check if input is disabled via ApplePS2Keyboard request
+    if (ignoreall)
+        return kIOReturnSuccess;
+    
+    // Ignore input for specified time after keyboard usage
     AbsoluteTime timestamp;
     clock_get_uptime(&timestamp);
+    uint64_t timestamp_ns;
+    absolutetime_to_nanoseconds(timestamp, &timestamp_ns);
+    
+    if (timestamp_ns - keytime < maxaftertyping)
+        return kIOReturnSuccess;
+    
+    
     UInt8* finger_data = &reportData[ETP_FINGER_DATA_OFFSET];
     UInt8 tp_info = reportData[ETP_TOUCH_INFO_OFFSET];
     int numFingers = 0;
@@ -457,6 +470,12 @@ bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
     if (!super::start(provider)) {
         return false;
     }
+    
+    // Read QuietTimeAfterTyping configuration value (if available)
+    OSNumber* quietTimeAfterTyping = OSDynamicCast(OSNumber, getProperty("QuietTimeAfterTyping"));
+    if (quietTimeAfterTyping != NULL)
+        maxaftertyping = quietTimeAfterTyping->unsigned64BitValue() * 1000000; // Convert to nanoseconds
+    
     workLoop = this->getWorkLoop();
     if (!workLoop) {
         IOLog("%s::%s Could not get a IOWorkLoop instance\n", getName(), elan_name);
@@ -527,4 +546,45 @@ IOReturn VoodooI2CELANTouchpadDriver::write_ELAN_cmd(UInt16 reg, UInt16 cmd) {
     IOReturn retVal = kIOReturnSuccess;
     retVal = api->writeI2C(reinterpret_cast<UInt8*>(&buffer), sizeof(buffer));
     return retVal;
+}
+
+IOReturn VoodooI2CELANTouchpadDriver::message(UInt32 type, IOService* provider, void* argument)
+{
+    switch (type)
+    {
+        case kKeyboardGetTouchStatus:
+        {
+#if DEBUG
+            IOLog("%s::getEnabledStatus = %s\n", getName(), ignoreall ? "false" : "true");
+#endif
+            bool* pResult = (bool*)argument;
+            *pResult = !ignoreall;
+            break;
+        }
+        case kKeyboardSetTouchStatus:
+        {
+            bool enable = *((bool*)argument);
+#if DEBUG
+            IOLog("%s::setEnabledStatus = %s\n", getName(), enable ? "true" : "false");
+#endif
+            // ignoreall is true when trackpad has been disabled
+            if (enable == ignoreall)
+            {
+                // save state, and update LED
+                ignoreall = !enable;
+            }
+            break;
+        }
+        case kKeyboardKeyPressTime:
+        {
+            //  Remember last time key was pressed
+            keytime = *((uint64_t*)argument);
+#if DEBUG
+            IOLog("%s::keyPressed = %llu\n", getName(), keytime);
+#endif
+            break;
+        }
+    }
+    
+    return kIOReturnSuccess;
 }
