@@ -513,8 +513,8 @@ void VoodooI2CELANTouchpadDriver::stop(IOService* provider) {
 void VoodooI2CELANTouchpadDriver::unpublish_multitouch_interface() {
     if (mt_interface) {
         mt_interface->stop(this);
-        mt_interface->release();
-        mt_interface = NULL;
+        // mt_interface->release();
+        // mt_interface = NULL;
     }
 }
 
