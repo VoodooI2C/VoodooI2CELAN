@@ -200,7 +200,7 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
             if(mt_interface) {
                 transducer->logical_max_x = mt_interface->logical_max_x;
                 transducer->logical_max_y = mt_interface->logical_max_y;
-                posY = transducer->logical_max_y - posY - 65535;
+                posY = transducer->logical_max_y - posY;
                 area_x = mk_x * (transducer->logical_max_x - ETP_FWIDTH_REDUCE);
                 area_y = mk_y * (transducer->logical_max_y - ETP_FWIDTH_REDUCE);
             }
