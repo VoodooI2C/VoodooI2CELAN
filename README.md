@@ -5,6 +5,7 @@ VoodooI2C ELAN is a macOS kernel extension for a limited subset of ELAN based to
 Please refer to https://voodooi2c.github.io/#Installation/Installation.
 
 ## Supported Touchpads
+* ELAN0000 (Found in Chromebooks)
 * ELAN1000
 * ELAN0000
 * ELAN0100
