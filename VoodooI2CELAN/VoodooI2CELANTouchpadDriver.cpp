@@ -68,7 +68,7 @@ bool VoodooI2CELANTouchpadDriver::init_device() {
     }
     IOReturn retVal;
     UInt8 val[3];
-    
+
     UInt32 max_report_x = 0;
     UInt32 max_report_y = 0;
 
@@ -120,7 +120,6 @@ bool VoodooI2CELANTouchpadDriver::init_device() {
     }
     retVal = read_ELAN_cmd(ETP_I2C_RESOLUTION_CMD, val);
     if (retVal != kIOReturnSuccess) {
-        
         return false;
     }
     UInt32 hw_res_x = val[0];
@@ -176,21 +175,21 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
         IOLog("%s::%s Invalid report (%d)\n", getName(), device_name, reportData[ETP_REPORT_ID_OFFSET]);
         return kIOReturnError;
     }
-    
+
     // Check if input is disabled via ApplePS2Keyboard request
     if (ignoreall)
         return kIOReturnSuccess;
-    
+
     // Ignore input for specified time after keyboard usage
     AbsoluteTime timestamp;
     clock_get_uptime(&timestamp);
     uint64_t timestamp_ns;
     absolutetime_to_nanoseconds(timestamp, &timestamp_ns);
-    
+
     if (timestamp_ns - keytime < maxaftertyping)
         return kIOReturnSuccess;
-    
-    
+
+
     UInt8* finger_data = &reportData[ETP_FINGER_DATA_OFFSET];
     UInt8 tp_info = reportData[ETP_TOUCH_INFO_OFFSET];
     int numFingers = 0;
@@ -210,7 +209,7 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
             unsigned int mk_y = (finger_data[3] >> 4);
             unsigned int area_x = mk_x;
             unsigned int area_y = mk_y;
-            if(mt_interface) {
+            if (mt_interface) {
                 transducer->logical_max_x = mt_interface->logical_max_x;
                 transducer->logical_max_y = mt_interface->logical_max_y;
                 posY = transducer->logical_max_y - posY;
@@ -219,11 +218,11 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
             }
             unsigned int major = mk_x;
             unsigned int minor = mk_y;
-            if(mk_x < mk_y) {
+            if (mk_x < mk_y) {
                 major = mk_y;
                 minor = mk_x;
             }
-            if(pressure > ETP_MAX_PRESSURE) {
+            if (pressure > ETP_MAX_PRESSURE) {
                 pressure = ETP_MAX_PRESSURE;
             }
             transducer->coordinates.x.update(posX, timestamp);
@@ -232,8 +231,8 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
             transducer->tip_switch.update(1, timestamp);
             transducer->id = i;
             transducer->secondary_id = i;
-            //transducer->pressure_physical_max = ETP_MAX_PRESSURE;
-            //transducer->tip_pressure.update(pressure, timestamp);
+            // transducer->pressure_physical_max = ETP_MAX_PRESSURE;
+            // transducer->tip_pressure.update(pressure, timestamp);
             numFingers += 1;
             finger_data += ETP_FINGER_DATA_LEN;
         } else {
@@ -243,8 +242,8 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
             transducer->coordinates.y.update(transducer->coordinates.y.last.value, timestamp);
             transducer->physical_button.update(0, timestamp);
             transducer->tip_switch.update(0, timestamp);
-            //transducer->pressure_physical_max = ETP_MAX_PRESSURE;
-            //transducer->tip_pressure.update(0, timestamp);
+            // transducer->pressure_physical_max = ETP_MAX_PRESSURE;
+            // transducer->tip_pressure.update(0, timestamp);
         }
     }
     // create new VoodooI2CMultitouchEvent
@@ -470,12 +469,12 @@ bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
     if (!super::start(provider)) {
         return false;
     }
-    
+
     // Read QuietTimeAfterTyping configuration value (if available)
     OSNumber* quietTimeAfterTyping = OSDynamicCast(OSNumber, getProperty("QuietTimeAfterTyping"));
     if (quietTimeAfterTyping != NULL)
         maxaftertyping = quietTimeAfterTyping->unsigned64BitValue() * 1000000; // Convert to nanoseconds
-    
+
     workLoop = this->getWorkLoop();
     if (!workLoop) {
         IOLog("%s::%s Could not get a IOWorkLoop instance\n", getName(), elan_name);
@@ -548,10 +547,8 @@ IOReturn VoodooI2CELANTouchpadDriver::write_ELAN_cmd(UInt16 reg, UInt16 cmd) {
     return retVal;
 }
 
-IOReturn VoodooI2CELANTouchpadDriver::message(UInt32 type, IOService* provider, void* argument)
-{
-    switch (type)
-    {
+IOReturn VoodooI2CELANTouchpadDriver::message(UInt32 type, IOService* provider, void* argument) {
+    switch (type) {
         case kKeyboardGetTouchStatus:
         {
 #if DEBUG
@@ -568,8 +565,7 @@ IOReturn VoodooI2CELANTouchpadDriver::message(UInt32 type, IOService* provider, 
             IOLog("%s::setEnabledStatus = %s\n", getName(), enable ? "true" : "false");
 #endif
             // ignoreall is true when trackpad has been disabled
-            if (enable == ignoreall)
-            {
+            if (enable == ignoreall) {
                 // save state, and update LED
                 ignoreall = !enable;
             }
@@ -585,6 +581,6 @@ IOReturn VoodooI2CELANTouchpadDriver::message(UInt32 type, IOService* provider, 
             break;
         }
     }
-    
+
     return kIOReturnSuccess;
 }

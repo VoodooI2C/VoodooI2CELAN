@@ -21,8 +21,7 @@
 #define ELAN_NAME "elan"
 
 // Message types defined by ApplePS2Keyboard
-enum
-{
+enum {
     // from keyboard to mouse/touchpad
     kKeyboardSetTouchStatus = iokit_vendor_specific_msg(100),   // set disable/enable touchpad (data is bool*)
     kKeyboardGetTouchStatus = iokit_vendor_specific_msg(101),   // get disable/enable touchpad (data is bool*)
@@ -33,7 +32,7 @@ enum
 
 class VoodooI2CELANTouchpadDriver : public IOService {
     OSDeclareDefaultStructors(VoodooI2CELANTouchpadDriver);
-    
+
     VoodooI2CDeviceNub* api;
     IOACPIPlatformDevice* acpi_device;
 
@@ -62,31 +61,31 @@ class VoodooI2CELANTouchpadDriver : public IOService {
      *
      */
     void stop(IOService* device) override;
-    
-protected:
+
+ protected:
     IOReturn setPowerState(unsigned long longpowerStateOrdinal, IOService* whatDevice) override;
 
-private:
+ private:
     bool awake;
     bool read_in_progress;
     bool ready_for_input;
-    
+
     char device_name[10];
     char elan_name[5];
-    
+
     int pressure_adjustment;
     int product_id;
-    
+
     IOCommandGate* command_gate;
     IOInterruptEventSource* interrupt_source;
     VoodooI2CMultitouchInterface *mt_interface;
     OSArray* transducers;
     IOWorkLoop* workLoop;
-    
+
     bool ignoreall;
     uint64_t maxaftertyping = 500000000;
     uint64_t keytime = 0;
-    
+
     /* Handles any interrupts that the ELAN device generates
      * @productId product ID of the ELAN device
      * @ic_type IC type (provided by the device)
@@ -167,7 +166,7 @@ private:
      * @return returns a IOReturn status of the reads (usually a representation of I2C bus)
      */
     IOReturn write_ELAN_cmd(UInt16 reg, UInt16 cmd);
-    
+
     /*
      * Called by ApplePS2Controller to notify of keyboard interactions
      * @type Custom message type in iokit_vendor_specific_msg range
@@ -176,7 +175,7 @@ private:
      *
      * @return kIOSuccess if the message is processed
      */
-    virtual IOReturn message(UInt32 type, IOService* provider, void* argument);
+    IOReturn message(UInt32 type, IOService* provider, void* argument) override;
 };
 
 #endif /* VOODOOI2C_ELAN_TOUCHPAD_DRIVER_HPP */
