@@ -42,7 +42,6 @@ void VoodooI2CELANTouchpadDriver::handle_input_threaded() {
 }
 
 bool VoodooI2CELANTouchpadDriver::init(OSDictionary *properties) {
-    transducers = NULL;
     if (!super::init(properties)) {
         return false;
     }
@@ -139,10 +138,9 @@ bool VoodooI2CELANTouchpadDriver::init_device() {
 }
 
 void VoodooI2CELANTouchpadDriver::interrupt_occurred(OSObject* owner, IOInterruptEventSource* src, int intCount) {
-    if (read_in_progress)
+    if (read_in_progress || !awake)
         return;
-    if (!awake)
-        return;
+
     read_in_progress = true;
     thread_t new_thread;
     kern_return_t ret = kernel_thread_start(OSMemberFunctionCast(thread_continue_t, this, &VoodooI2CELANTouchpadDriver::handle_input_threaded), this, &new_thread);
@@ -402,37 +400,23 @@ bool VoodooI2CELANTouchpadDriver::reset_device() {
 void VoodooI2CELANTouchpadDriver::release_resources() {
     if (command_gate) {
         workLoop->removeEventSource(command_gate);
-        command_gate->release();
-        command_gate = NULL;
+        OSSafeReleaseNULL(command_gate);
     }
     if (interrupt_source) {
         interrupt_source->disable();
         workLoop->removeEventSource(interrupt_source);
-        interrupt_source->release();
-        interrupt_source = NULL;
+        OSSafeReleaseNULL(interrupt_source);
     }
-    if (workLoop) {
-        workLoop->release();
-        workLoop = NULL;
-    }
-    if (acpi_device) {
-        acpi_device->release();
-        acpi_device = NULL;
-    }
+    OSSafeReleaseNULL(workLoop);
+    OSSafeReleaseNULL(acpi_device);
     if (api) {
         if (api->isOpen(this)) {
             api->close(this);
         }
-        api->release();
-        api = NULL;
+        OSSafeReleaseNULL(api);
     }
     if (transducers) {
-        for (int i = 0; i < transducers->getCount(); i++) {
-            OSObject* object = transducers->getObject(i);
-            if (object) {
-                object->release();
-            }
-        }
+        transducers->flushCollection();
         OSSafeReleaseNULL(transducers);
     }
 }
@@ -506,7 +490,7 @@ bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
     registerPowerDriver(this, VoodooI2CIOPMPowerStates, kVoodooI2CIOPMNumberPowerStates);
     IOSleep(100);
     ready_for_input = true;
-    setProperty("VoodooI2CServices Supported", OSBoolean::withBoolean(true));
+    setProperty("VoodooI2CServices Supported", kOSBooleanTrue);
     IOLog("%s::%s VoodooI2CELAN has started\n", getName(), elan_name);
     mt_interface->registerService();
     registerService();
