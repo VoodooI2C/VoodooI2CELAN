@@ -284,7 +284,7 @@ VoodooI2CELANTouchpadDriver* VoodooI2CELANTouchpadDriver::probe(IOService* provi
 }
 
 bool VoodooI2CELANTouchpadDriver::publish_multitouch_interface() {
-    mt_interface = new VoodooI2CMultitouchInterface();
+    mt_interface = OSTypeAlloc(VoodooI2CMultitouchInterface);
     if (!mt_interface) {
         IOLog("%s::%s No memory to allocate VoodooI2CMultitouchInterface instance\n", getName(), device_name);
         goto multitouch_exit;
@@ -299,6 +299,7 @@ bool VoodooI2CELANTouchpadDriver::publish_multitouch_interface() {
     }
     if (!mt_interface->start(this)) {
         IOLog("%s::%s Failed to start multitouch interface\n", getName(), device_name);
+        mt_interface->detach(this);
         goto multitouch_exit;
     }
     // Assume we are a touchpad
@@ -307,8 +308,9 @@ bool VoodooI2CELANTouchpadDriver::publish_multitouch_interface() {
     mt_interface->setProperty(kIOHIDVendorIDKey, 0x04f3, 32);
     mt_interface->setProperty(kIOHIDProductIDKey, product_id, 32);
     return true;
+
 multitouch_exit:
-    unpublish_multitouch_interface();
+    OSSafeReleaseNULL(mt_interface);
     return false;
 }
 
@@ -525,8 +527,8 @@ void VoodooI2CELANTouchpadDriver::stop(IOService* provider) {
 void VoodooI2CELANTouchpadDriver::unpublish_multitouch_interface() {
     if (mt_interface) {
         mt_interface->stop(this);
-        // mt_interface->release();
-        // mt_interface = NULL;
+        mt_interface->detach(this);
+        OSSafeReleaseNULL(mt_interface);
     }
 }
 
