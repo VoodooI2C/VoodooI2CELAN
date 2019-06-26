@@ -415,10 +415,7 @@ void VoodooI2CELANTouchpadDriver::release_resources() {
         }
         OSSafeReleaseNULL(api);
     }
-    if (transducers) {
-        transducers->flushCollection();
-        OSSafeReleaseNULL(transducers);
-    }
+    OSSafeReleaseNULL(transducers);
 }
 
 IOReturn VoodooI2CELANTouchpadDriver::setPowerState(unsigned long longpowerStateOrdinal, IOService* whatDevice) {
