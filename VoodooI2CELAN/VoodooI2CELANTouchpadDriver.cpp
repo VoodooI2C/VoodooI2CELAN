@@ -204,29 +204,23 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
         if (contactValid) {
             unsigned int posX = ((finger_data[0] & 0xf0) << 4) | finger_data[1];
             unsigned int posY = ((finger_data[0] & 0x0f) << 8) | finger_data[2];
-            unsigned int pressure = finger_data[4] + pressure_adjustment;
-            unsigned int mk_x = (finger_data[3] & 0x0f);
-            unsigned int mk_y = (finger_data[3] >> 4);
-            unsigned int area_x = mk_x;
-            unsigned int area_y = mk_y;
+            // unsigned int pressure = finger_data[4] + pressure_adjustment;
+            // unsigned int major = (finger_data[3] & 0x0f);
+            // unsigned int minor = (finger_data[3] >> 4);
+
             if (mt_interface) {
                 transducer->logical_max_x = mt_interface->logical_max_x;
                 transducer->logical_max_y = mt_interface->logical_max_y;
                 posY = transducer->logical_max_y - posY;
-                area_x = mk_x * (transducer->logical_max_x - ETP_FWIDTH_REDUCE);
-                area_y = mk_y * (transducer->logical_max_y - ETP_FWIDTH_REDUCE);
             }
-            unsigned int major = mk_x;
-            unsigned int minor = mk_y;
-            if (mk_x < mk_y) {
-                major = mk_y;
-                minor = mk_x;
-            }
-            if (pressure > ETP_MAX_PRESSURE) {
-                pressure = ETP_MAX_PRESSURE;
-            }
+
+            // if (pressure > ETP_MAX_PRESSURE)
+            //     pressure = ETP_MAX_PRESSURE;
+
             transducer->coordinates.x.update(posX, timestamp);
             transducer->coordinates.y.update(posY, timestamp);
+            // transducer->touch_major.update(major, timestamp);
+            // transducer->touch_minor.update(minor, timestamp);
             transducer->physical_button.update(tp_info & 0x01, timestamp);
             transducer->tip_switch.update(1, timestamp);
             transducer->id = i;
