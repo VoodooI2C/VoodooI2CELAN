@@ -53,6 +53,7 @@ bool VoodooI2CELANTouchpadDriver::init(OSDictionary *properties) {
     for (int i = 0; i < ETP_MAX_FINGERS; i++) {
         VoodooI2CDigitiserTransducer* transducer = VoodooI2CDigitiserTransducer::transducer(type, NULL);
         transducers->setObject(transducer);
+        OSSafeReleaseNULL(transducer);
     }
     awake = true;
     ready_for_input = false;
