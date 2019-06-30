@@ -28,38 +28,52 @@ bool VoodooI2CELANTouchpadDriver::check_ASUS_firmware(UInt8 productId, UInt8 ic_
     return false;
 }
 
-void VoodooI2CELANTouchpadDriver::free() {
-    IOLog("%s::%s VoodooI2CELAN resources have been deallocated\n", getName(), elan_name);
-    super::free();
-}
-
-void VoodooI2CELANTouchpadDriver::handle_input_threaded() {
-    if (!ready_for_input) {
-        return;
-    }
-    command_gate->attemptAction(OSMemberFunctionCast(IOCommandGate::Action, this, &VoodooI2CELANTouchpadDriver::parse_ELAN_report));
-    read_in_progress = false;
-}
-
 bool VoodooI2CELANTouchpadDriver::init(OSDictionary *properties) {
-    if (!super::init(properties)) {
+    if (!super::init(properties))
         return false;
-    }
+
+    // Allocate finger transducers
     transducers = OSArray::withCapacity(ETP_MAX_FINGERS);
-    if (!transducers) {
+    if (!transducers)
         return false;
-    }
+
     DigitiserTransducerType type = kDigitiserTransducerFinger;
     for (int i = 0; i < ETP_MAX_FINGERS; i++) {
         VoodooI2CDigitiserTransducer* transducer = VoodooI2CDigitiserTransducer::transducer(type, NULL);
         transducers->setObject(transducer);
         OSSafeReleaseNULL(transducer);
     }
+
+    // Allocate the multitouch interface
+    mt_interface = OSTypeAlloc(VoodooI2CMultitouchInterface);
+    if (!mt_interface) {
+        IOLog("%s::%s No memory to allocate VoodooI2CMultitouchInterface instance\n", getName(), device_name);
+        OSSafeReleaseNULL(transducers);
+        return false;
+    }
+
     awake = true;
     ready_for_input = false;
     read_in_progress = false;
     strncpy(elan_name, ELAN_NAME, strlen(ELAN_NAME));
     return true;
+}
+
+void VoodooI2CELANTouchpadDriver::free() {
+    OSSafeReleaseNULL(transducers);
+
+    OSSafeReleaseNULL(mt_interface);
+
+    IOLog("%s::%s VoodooI2CELAN resources have been deallocated\n", getName(), elan_name);
+    super::free();
+}
+
+void VoodooI2CELANTouchpadDriver::handle_input_threaded() {
+    if (!ready_for_input)
+        return;
+
+    command_gate->attemptAction(OSMemberFunctionCast(IOCommandGate::Action, this, &VoodooI2CELANTouchpadDriver::parse_ELAN_report));
+    read_in_progress = false;
 }
 
 bool VoodooI2CELANTouchpadDriver::init_device() {
@@ -283,11 +297,6 @@ VoodooI2CELANTouchpadDriver* VoodooI2CELANTouchpadDriver::probe(IOService* provi
 }
 
 bool VoodooI2CELANTouchpadDriver::publish_multitouch_interface() {
-    mt_interface = OSTypeAlloc(VoodooI2CMultitouchInterface);
-    if (!mt_interface) {
-        IOLog("%s::%s No memory to allocate VoodooI2CMultitouchInterface instance\n", getName(), device_name);
-        goto multitouch_exit;
-    }
     if (!mt_interface->init(NULL)) {
         IOLog("%s::%s Failed to init multitouch interface\n", getName(), device_name);
         goto multitouch_exit;
@@ -416,7 +425,6 @@ void VoodooI2CELANTouchpadDriver::release_resources() {
         }
         OSSafeReleaseNULL(api);
     }
-    OSSafeReleaseNULL(transducers);
 }
 
 IOReturn VoodooI2CELANTouchpadDriver::setPowerState(unsigned long longpowerStateOrdinal, IOService* whatDevice) {
@@ -510,7 +518,6 @@ void VoodooI2CELANTouchpadDriver::unpublish_multitouch_interface() {
     if (mt_interface) {
         mt_interface->stop(this);
         mt_interface->detach(this);
-        OSSafeReleaseNULL(mt_interface);
     }
 }
 
