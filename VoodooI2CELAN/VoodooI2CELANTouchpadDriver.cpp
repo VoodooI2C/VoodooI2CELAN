@@ -48,7 +48,6 @@ bool VoodooI2CELANTouchpadDriver::init(OSDictionary *properties) {
     mt_interface = OSTypeAlloc(VoodooI2CMultitouchInterface);
     if (!mt_interface) {
         IOLog("%s::%s No memory to allocate VoodooI2CMultitouchInterface instance\n", getName(), device_name);
-        OSSafeReleaseNULL(transducers);
         return false;
     }
 
@@ -299,27 +298,27 @@ VoodooI2CELANTouchpadDriver* VoodooI2CELANTouchpadDriver::probe(IOService* provi
 bool VoodooI2CELANTouchpadDriver::publish_multitouch_interface() {
     if (!mt_interface->init(NULL)) {
         IOLog("%s::%s Failed to init multitouch interface\n", getName(), device_name);
-        goto multitouch_exit;
+        return false;
     }
     if (!mt_interface->attach(this)) {
         IOLog("%s::%s Failed to attach multitouch interface\n", getName(), device_name);
-        goto multitouch_exit;
+        return false;
     }
     if (!mt_interface->start(this)) {
         IOLog("%s::%s Failed to start multitouch interface\n", getName(), device_name);
         mt_interface->detach(this);
-        goto multitouch_exit;
+        return false;
     }
+
     // Assume we are a touchpad
     mt_interface->setProperty(kIOHIDDisplayIntegratedKey, false);
     // 0x04f3 is Elan's Vendor Id
     mt_interface->setProperty(kIOHIDVendorIDKey, 0x04f3, 32);
     mt_interface->setProperty(kIOHIDProductIDKey, product_id, 32);
-    return true;
 
-multitouch_exit:
-    OSSafeReleaseNULL(mt_interface);
-    return false;
+    mt_interface->registerService();
+
+    return true;
 }
 
 IOReturn VoodooI2CELANTouchpadDriver::read_ELAN_cmd(UInt16 reg, UInt8* val) {
@@ -452,9 +451,8 @@ IOReturn VoodooI2CELANTouchpadDriver::setPowerState(unsigned long longpowerState
 }
 
 bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
-    if (!super::start(provider)) {
+    if (!super::start(provider))
         return false;
-    }
 
     // Read QuietTimeAfterTyping configuration value (if available)
     OSNumber* quietTimeAfterTyping = OSDynamicCast(OSNumber, getProperty("QuietTimeAfterTyping"));
@@ -487,7 +485,7 @@ bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
     publish_multitouch_interface();
     if (!init_device()) {
         IOLog("%s::%s Failed to init device\n", getName(), elan_name);
-        return NULL;
+        return false;
     }
     workLoop->addEventSource(interrupt_source);
     interrupt_source->enable();
@@ -498,7 +496,6 @@ bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
     ready_for_input = true;
     setProperty("VoodooI2CServices Supported", kOSBooleanTrue);
     IOLog("%s::%s VoodooI2CELAN has started\n", getName(), elan_name);
-    mt_interface->registerService();
     registerService();
     return true;
 start_exit:
