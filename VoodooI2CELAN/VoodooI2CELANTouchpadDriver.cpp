@@ -252,14 +252,16 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
             // transducer->tip_pressure.update(0, timestamp);
         }
     }
+
     // create new VoodooI2CMultitouchEvent
     VoodooI2CMultitouchEvent event;
     event.contact_count = numFingers;
     event.transducers = transducers;
+
     // send the event into the multitouch interface
-    if (mt_interface) {
+    if (mt_interface)
         mt_interface->handleInterruptReport(event, timestamp);
-    }
+
     return kIOReturnSuccess;
 }
 
@@ -315,8 +317,6 @@ bool VoodooI2CELANTouchpadDriver::publish_multitouch_interface() {
     // 0x04f3 is Elan's Vendor Id
     mt_interface->setProperty(kIOHIDVendorIDKey, 0x04f3, 32);
     mt_interface->setProperty(kIOHIDProductIDKey, product_id, 32);
-
-    mt_interface->registerService();
 
     return true;
 }
@@ -418,11 +418,12 @@ void VoodooI2CELANTouchpadDriver::release_resources() {
     }
     OSSafeReleaseNULL(workLoop);
     OSSafeReleaseNULL(acpi_device);
+
     if (api) {
         if (api->isOpen(this)) {
             api->close(this);
         }
-        OSSafeReleaseNULL(api);
+        api = nullptr;
     }
 }
 
@@ -471,7 +472,6 @@ bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
         goto start_exit;
     }
     acpi_device->retain();
-    api->retain();
     if (!api->open(this)) {
         IOLog("%s::%s Could not open API\n", getName(), elan_name);
         goto start_exit;
@@ -485,7 +485,7 @@ bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
     publish_multitouch_interface();
     if (!init_device()) {
         IOLog("%s::%s Failed to init device\n", getName(), elan_name);
-        return false;
+        goto start_exit;
     }
     workLoop->addEventSource(interrupt_source);
     interrupt_source->enable();
@@ -496,6 +496,7 @@ bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
     ready_for_input = true;
     setProperty("VoodooI2CServices Supported", kOSBooleanTrue);
     IOLog("%s::%s VoodooI2CELAN has started\n", getName(), elan_name);
+    mt_interface->registerService();
     registerService();
     return true;
 start_exit:
