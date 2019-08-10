@@ -282,8 +282,8 @@ VoodooI2CELANTouchpadDriver* VoodooI2CELANTouchpadDriver::probe(IOService* provi
         return NULL;
     }
     const char* acpi_name = reinterpret_cast<char*>(const_cast<void*>(name_data->getBytesNoCopy()));
-    if (acpi_name[0] != 'E' && acpi_name[1] != 'L'
-        && acpi_name[2] != 'A'&& acpi_name[3] != 'N') {
+    if (acpi_name[0] != 'E' || acpi_name[1] != 'L'
+        || acpi_name[2] != 'A' || acpi_name[3] != 'N') {
         IOLog("%s::%s ELAN device not found, instead found %s\n", getName(), elan_name, acpi_name);
         return NULL;
     }
