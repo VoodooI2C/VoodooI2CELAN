@@ -8,8 +8,10 @@
 
 #ifndef VOODOOI2C_ELAN_TOUCHPAD_DRIVER_HPP
 #define VOODOOI2C_ELAN_TOUCHPAD_DRIVER_HPP
+#define INTERRUPT_SIMULATOR_TIMEOUT 5
 
 #include <IOKit/IOService.h>
+#include <IOKit/IOTimerEventSource.h>
 
 #include "../../../VoodooI2C/VoodooI2C/VoodooI2CDevice/VoodooI2CDeviceNub.hpp"
 
@@ -82,6 +84,7 @@ private:
     VoodooI2CMultitouchInterface *mt_interface;
     OSArray* transducers;
     IOWorkLoop* workLoop;
+    IOTimerEventSource* interrupt_simulator; // Sasha - Impl polling support
     
     bool ignoreall;
     uint64_t maxaftertyping = 500000000;
@@ -177,6 +180,8 @@ private:
      * @return kIOSuccess if the message is processed
      */
     virtual IOReturn message(UInt32 type, IOService* provider, void* argument);
+    
+    void simulateInterrupt(OSObject* owner, IOTimerEventSource* timer); // Sasha - impl polling support
 };
 
 #endif /* VOODOOI2C_ELAN_TOUCHPAD_DRIVER_HPP */
