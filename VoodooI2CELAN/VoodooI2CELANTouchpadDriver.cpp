@@ -171,10 +171,10 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
         IOLog("%s::%s API is null\n", getName(), device_name);
         return kIOReturnError;
     }
+
     UInt8 reportData[ETP_MAX_REPORT_LEN];
-    for (int i = 0; i < ETP_MAX_REPORT_LEN; i++) {
-        reportData[i] = 0;
-    }
+    memset(&reportData, 0, sizeof(reportData));
+
     IOReturn retVal = read_raw_data(0, sizeof(reportData), reportData);
     if (retVal != kIOReturnSuccess) {
         IOLog("%s::%s Failed to handle input\n", getName(), device_name);
@@ -217,14 +217,21 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
             unsigned int posX = ((finger_data[0] & 0xf0) << 4) | finger_data[1];
             unsigned int posY = ((finger_data[0] & 0x0f) << 8) | finger_data[2];
             // unsigned int pressure = finger_data[4] + pressure_adjustment;
-            // unsigned int major = (finger_data[3] & 0x0f);
-            // unsigned int minor = (finger_data[3] >> 4);
+            // unsigned int mk_x = (finger_data[3] & 0x0f);
+            // unsigned int mk_y = (finger_data[3] >> 4);
+            // unsigned int area_x = mk_x;
+            // unsigned int area_y = mk_y;
 
             if (mt_interface) {
                 transducer->logical_max_x = mt_interface->logical_max_x;
                 transducer->logical_max_y = mt_interface->logical_max_y;
                 posY = transducer->logical_max_y - posY;
+                // area_x = mk_x * (transducer->logical_max_x - ETP_FWIDTH_REDUCE);
+                // area_y = mk_y * (transducer->logical_max_y - ETP_FWIDTH_REDUCE);
             }
+
+            // unsigned int major = max(area_x, area_y);
+            // unsigned int minor = min(area_x, area_y);
 
             // if (pressure > ETP_MAX_PRESSURE)
             //     pressure = ETP_MAX_PRESSURE;
