@@ -43,6 +43,7 @@ void VoodooI2CELANTouchpadDriver::handle_input_threaded() {
 
 bool VoodooI2CELANTouchpadDriver::init(OSDictionary *properties) {
     transducers = NULL;
+    interrupt_simulator = NULL;
     if (!super::init(properties)) {
         return false;
     }
