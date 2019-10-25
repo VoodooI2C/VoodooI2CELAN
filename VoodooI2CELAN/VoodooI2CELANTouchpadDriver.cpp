@@ -180,11 +180,17 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
         IOLog("%s::%s Failed to handle input\n", getName(), device_name);
         return retVal;
     }
-    if (!transducers) {
+
+    if (!transducers)
         return kIOReturnBadArgument;
-    }
-    if (reportData[ETP_REPORT_ID_OFFSET] != ETP_REPORT_ID) {
-        IOLog("%s::%s Invalid report (%d)\n", getName(), device_name, reportData[ETP_REPORT_ID_OFFSET]);
+
+    UInt8 report_id = reportData[ETP_REPORT_ID_OFFSET];
+    if (report_id != ETP_REPORT_ID) {
+        // Ignore 0xFF reports
+        if (report_id == 0xFF)
+            return kIOReturnSuccess;
+
+        IOLog("%s::%s Invalid report (%d)\n", getName(), device_name, report_id);
         return kIOReturnError;
     }
 
