@@ -58,7 +58,7 @@
 			<key>RM,deliverNotifications</key>
 			<true/>
 			<key>QuietTimeAfterTyping</key>
-			<integer>500</integer>
+			<integer>100</integer>
 		</dict>
 	</dict>
 	<key>NSHumanReadableCopyright</key>
