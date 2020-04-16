@@ -213,10 +213,10 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
     int numFingers = 0;
     for (int i = 0; i < ETP_MAX_FINGERS; i++) {
         VoodooI2CDigitiserTransducer* transducer = OSDynamicCast(VoodooI2CDigitiserTransducer,  transducers->getObject(i));
-        transducer->type = kDigitiserTransducerFinger;
         if (!transducer) {
             continue;
         }
+        transducer->type = kDigitiserTransducerFinger;
         bool contactValid = tp_info & (1U << (3 + i));
         transducer->is_valid = contactValid;
         if (contactValid) {
