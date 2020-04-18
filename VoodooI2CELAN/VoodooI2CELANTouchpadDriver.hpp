@@ -10,6 +10,7 @@
 #define VOODOOI2C_ELAN_TOUCHPAD_DRIVER_HPP
 
 #include <IOKit/IOService.h>
+#include <IOKit/IOTimerEventSource.h>
 
 #include "../../../VoodooI2C/VoodooI2C/VoodooI2CDevice/VoodooI2CDeviceNub.hpp"
 
@@ -66,6 +67,7 @@ class VoodooI2CELANTouchpadDriver : public IOService {
     IOReturn setPowerState(unsigned long longpowerStateOrdinal, IOService* whatDevice) override;
 
  private:
+    IOTimerEventSource* polling_timer;
     bool awake;
     bool read_in_progress;
     bool ready_for_input;
@@ -176,6 +178,8 @@ class VoodooI2CELANTouchpadDriver : public IOService {
      * @return kIOSuccess if the message is processed
      */
     IOReturn message(UInt32 type, IOService* provider, void* argument) override;
+    
+    void simulate_interrupt(OSObject* owner);
 };
 
 #endif /* VOODOOI2C_ELAN_TOUCHPAD_DRIVER_HPP */
