@@ -29,11 +29,11 @@ bool VoodooI2CELANTouchpadDriver::check_ASUS_firmware(UInt8 productId, UInt8 ic_
 }
 
 bool VoodooI2CELANTouchpadDriver::init(OSDictionary *properties) {
-    OSSafeReleaseNULL(interrupt_simulator);
-    
     if (!super::init(properties))
         return false;
-
+    
+    interrupt_simulator = NULL;
+    
     // Allocate finger transducers
     transducers = OSArray::withCapacity(ETP_MAX_FINGERS);
     if (!transducers)
