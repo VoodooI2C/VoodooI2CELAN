@@ -8,8 +8,10 @@
 
 #ifndef VOODOOI2C_ELAN_TOUCHPAD_DRIVER_HPP
 #define VOODOOI2C_ELAN_TOUCHPAD_DRIVER_HPP
+#define INTERRUPT_SIMULATOR_TIMEOUT 5
 
 #include <IOKit/IOService.h>
+#include <IOKit/IOTimerEventSource.h>
 
 #include "../../../VoodooI2C/VoodooI2C/VoodooI2CDevice/VoodooI2CDeviceNub.hpp"
 
@@ -82,6 +84,8 @@ class VoodooI2CELANTouchpadDriver : public IOService {
     OSArray* transducers;
     IOWorkLoop* workLoop;
 
+    IOTimerEventSource* interrupt_simulator;
+    
     bool ignoreall;
     uint64_t maxaftertyping = 500000000;
     uint64_t keytime = 0;
@@ -176,6 +180,8 @@ class VoodooI2CELANTouchpadDriver : public IOService {
      * @return kIOSuccess if the message is processed
      */
     IOReturn message(UInt32 type, IOService* provider, void* argument) override;
+    
+    void simulateInterrupt(OSObject* owner, IOTimerEventSource* timer); // Sasha - impl polling support
 };
 
 #endif /* VOODOOI2C_ELAN_TOUCHPAD_DRIVER_HPP */
