@@ -509,7 +509,7 @@ bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
         publish_multitouch_interface();
         if (!init_device()) {
             IOLog("%s::%s Failed to init device\n", getName(), elan_name);
-            return NULL;
+            goto start_exit;
         }
         workLoop->addEventSource(interrupt_simulator);
         interrupt_simulator->setTimeoutMS(200);
@@ -518,7 +518,7 @@ bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
         publish_multitouch_interface();
         if (!init_device()) {
             IOLog("%s::%s Failed to init device\n", getName(), elan_name);
-            return NULL;
+            goto start_exit;
         }
         workLoop->addEventSource(interrupt_source);
         interrupt_source->enable();

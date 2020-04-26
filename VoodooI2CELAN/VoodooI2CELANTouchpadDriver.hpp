@@ -8,7 +8,6 @@
 
 #ifndef VOODOOI2C_ELAN_TOUCHPAD_DRIVER_HPP
 #define VOODOOI2C_ELAN_TOUCHPAD_DRIVER_HPP
-#define INTERRUPT_SIMULATOR_TIMEOUT 5
 
 #include <IOKit/IOService.h>
 #include <IOKit/IOTimerEventSource.h>
@@ -21,6 +20,7 @@
 #include "../../../Dependencies/helpers.hpp"
 
 #define ELAN_NAME "elan"
+#define INTERRUPT_SIMULATOR_TIMEOUT 5
 
 // Message types defined by ApplePS2Keyboard
 enum {
