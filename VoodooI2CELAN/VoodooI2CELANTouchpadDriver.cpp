@@ -31,7 +31,9 @@ bool VoodooI2CELANTouchpadDriver::check_ASUS_firmware(UInt8 productId, UInt8 ic_
 bool VoodooI2CELANTouchpadDriver::init(OSDictionary *properties) {
     if (!super::init(properties))
         return false;
-
+    
+    interrupt_simulator = NULL;
+    
     // Allocate finger transducers
     transducers = OSArray::withCapacity(ETP_MAX_FINGERS);
     if (!transducers)
@@ -429,6 +431,11 @@ void VoodooI2CELANTouchpadDriver::release_resources() {
         workLoop->removeEventSource(interrupt_source);
         OSSafeReleaseNULL(interrupt_source);
     }
+    if (interrupt_simulator) {
+        interrupt_simulator->disable();
+        workLoop->removeEventSource(interrupt_simulator);
+        OSSafeReleaseNULL(interrupt_simulator);
+    }
     OSSafeReleaseNULL(workLoop);
     OSSafeReleaseNULL(acpi_device);
 
@@ -491,17 +498,32 @@ bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
     }
     // set interrupts AFTER device is initialised
     interrupt_source = IOInterruptEventSource::interruptEventSource(this, OSMemberFunctionCast(IOInterruptEventAction, this, &VoodooI2CELANTouchpadDriver::interrupt_occurred), api, 0);
+    
     if (!interrupt_source) {
-        IOLog("%s::%s Could not get interrupt event source\n", getName(), elan_name);
-        goto start_exit;
+        IOLog("%s::%s Could not get interrupt event source, trying to fallback on polling\n", getName(), elan_name);
+        interrupt_simulator = IOTimerEventSource::timerEventSource(this, OSMemberFunctionCast(IOTimerEventSource::Action, this, &VoodooI2CELANTouchpadDriver::simulateInterrupt));
+        if (!interrupt_simulator) {
+            IOLog("%s::%s Could not get timer event source\n", getName(), elan_name);
+            goto start_exit;
+        }
+        publish_multitouch_interface();
+        if (!init_device()) {
+            IOLog("%s::%s Failed to init device\n", getName(), elan_name);
+            goto start_exit;
+        }
+        workLoop->addEventSource(interrupt_simulator);
+        interrupt_simulator->setTimeoutMS(200);
+        IOLog("%s::%s Polling mode initialisation succeeded.", getName(), elan_name);
+    } else {
+        publish_multitouch_interface();
+        if (!init_device()) {
+            IOLog("%s::%s Failed to init device\n", getName(), elan_name);
+            goto start_exit;
+        }
+        workLoop->addEventSource(interrupt_source);
+        interrupt_source->enable();
     }
-    publish_multitouch_interface();
-    if (!init_device()) {
-        IOLog("%s::%s Failed to init device\n", getName(), elan_name);
-        goto start_exit;
-    }
-    workLoop->addEventSource(interrupt_source);
-    interrupt_source->enable();
+    
     PMinit();
     api->joinPMtree(this);
     registerPowerDriver(this, VoodooI2CIOPMPowerStates, kVoodooI2CIOPMNumberPowerStates);
@@ -515,6 +537,11 @@ bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
 start_exit:
     release_resources();
     return false;
+}
+
+void VoodooI2CELANTouchpadDriver::simulateInterrupt(OSObject* owner, IOTimerEventSource *timer) {
+    interrupt_occurred(owner, NULL, 0);
+    interrupt_simulator->setTimeoutMS(INTERRUPT_SIMULATOR_TIMEOUT);
 }
 
 void VoodooI2CELANTouchpadDriver::stop(IOService* provider) {
