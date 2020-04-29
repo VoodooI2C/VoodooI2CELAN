@@ -69,7 +69,6 @@ class VoodooI2CELANTouchpadDriver : public IOService {
 
  private:
     bool awake;
-    bool read_in_progress;
     bool ready_for_input;
 
     char device_name[10];
@@ -97,11 +96,7 @@ class VoodooI2CELANTouchpadDriver : public IOService {
      * @return returns true if this ELAN device is ASUS manufactured
      */
     bool check_ASUS_firmware(UInt8 productId, UInt8 ic_type);
-    /* Handles input in a threaded manner, then
-     * calls parse_ELAN_report via the command gate for synchronisation
-     *
-     */
-    void handle_input_threaded();
+
     /* Sends the appropriate ELAN protocol packets to
      * initialise the device into multitouch mode
      *
