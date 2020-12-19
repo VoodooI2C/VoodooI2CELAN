@@ -56,7 +56,7 @@ bool VoodooI2CELANTouchpadDriver::init(OSDictionary *properties) {
 
     awake = true;
     ready_for_input = false;
-    strncpy(elan_name, ELAN_NAME, strlen(ELAN_NAME));
+    strlcpy(elan_name, ELAN_NAME, sizeof(elan_name));
     return true;
 }
 
@@ -286,7 +286,7 @@ VoodooI2CELANTouchpadDriver* VoodooI2CELANTouchpadDriver::probe(IOService* provi
         IOLog("%s::%s ELAN device not found, instead found %s\n", getName(), elan_name, acpi_name);
         return NULL;
     }
-    strncpy(device_name, acpi_name, 10);
+    strlcpy(device_name, acpi_name, sizeof(device_name));
     IOLog("%s::%s ELAN device found (%s)\n", getName(), elan_name, device_name);
     api = OSDynamicCast(VoodooI2CDeviceNub, provider);
     if (!api) {
