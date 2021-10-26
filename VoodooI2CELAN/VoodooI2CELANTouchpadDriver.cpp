@@ -468,10 +468,39 @@ IOReturn VoodooI2CELANTouchpadDriver::setPowerState(unsigned long longpowerState
     return kIOPMAckImplied;
 }
 
+bool VoodooI2CELANTouchpadDriver::setupPolling() {
+    interrupt_simulator = IOTimerEventSource::timerEventSource(this, OSMemberFunctionCast(IOTimerEventSource::Action, this, &VoodooI2CELANTouchpadDriver::simulateInterrupt));
+    if (!interrupt_simulator) {
+        IOLog("%s::%s Could not get timer event source\n", getName(), elan_name);
+        return false;
+    }
+    publish_multitouch_interface();
+    if (!init_device()) {
+        IOLog("%s::%s Failed to init device\n", getName(), elan_name);
+        return false;
+    }
+    workLoop->addEventSource(interrupt_simulator);
+    interrupt_simulator->setTimeoutMS(polling_interval);
+    IOLog("%s::%s Polling mode initialisation succeeded.", getName(), elan_name);
+    return true;
+}
+
 bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
     if (!super::start(provider))
         return false;
-
+    
+    OSBoolean* forcePollingProperty = OSDynamicCast(OSBoolean, getProperty("ForcePolling"));
+    if(forcePollingProperty != NULL) {
+        force_polling = forcePollingProperty->getValue();
+    }
+    
+    OSNumber* pollingIntervalProperty = OSDynamicCast(OSNumber, getProperty("PollingInterval"));
+    if(pollingIntervalProperty != NULL) {
+        polling_interval = pollingIntervalProperty->unsigned32BitValue();
+    }else {
+        polling_interval = 200;
+    }
+    
     // Read QuietTimeAfterTyping configuration value (if available)
     OSNumber* quietTimeAfterTyping = OSDynamicCast(OSNumber, getProperty("QuietTimeAfterTyping"));
     if (quietTimeAfterTyping != NULL)
@@ -494,32 +523,24 @@ bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
         goto start_exit;
     }
 
-    // set interrupts AFTER device is initialised
-    interrupt_source = IOInterruptEventSource::interruptEventSource(this, OSMemberFunctionCast(IOInterruptEventAction, this, &VoodooI2CELANTouchpadDriver::interrupt_occurred), api, 0);
+    if(this->force_polling) {
+        if(!this->setupPolling()) goto start_exit;
+    }else {
+        // set interrupts AFTER device is initialised
+        interrupt_source = IOInterruptEventSource::interruptEventSource(this, OSMemberFunctionCast(IOInterruptEventAction, this, &VoodooI2CELANTouchpadDriver::interrupt_occurred), api, 0);
 
-    if (!interrupt_source) {
-        IOLog("%s::%s Could not get interrupt event source, trying to fallback on polling\n", getName(), elan_name);
-        interrupt_simulator = IOTimerEventSource::timerEventSource(this, OSMemberFunctionCast(IOTimerEventSource::Action, this, &VoodooI2CELANTouchpadDriver::simulateInterrupt));
-        if (!interrupt_simulator) {
-            IOLog("%s::%s Could not get timer event source\n", getName(), elan_name);
-            goto start_exit;
+        if (!interrupt_source) {
+            IOLog("%s::%s Could not get interrupt event source, trying to fallback on polling\n", getName(), elan_name);
+            if(!this->setupPolling()) goto start_exit;
+        } else {
+            publish_multitouch_interface();
+            if (!init_device()) {
+                IOLog("%s::%s Failed to init device\n", getName(), elan_name);
+                goto start_exit;
+            }
+            workLoop->addEventSource(interrupt_source);
+            interrupt_source->enable();
         }
-        publish_multitouch_interface();
-        if (!init_device()) {
-            IOLog("%s::%s Failed to init device\n", getName(), elan_name);
-            goto start_exit;
-        }
-        workLoop->addEventSource(interrupt_simulator);
-        interrupt_simulator->setTimeoutMS(200);
-        IOLog("%s::%s Polling mode initialisation succeeded.", getName(), elan_name);
-    } else {
-        publish_multitouch_interface();
-        if (!init_device()) {
-            IOLog("%s::%s Failed to init device\n", getName(), elan_name);
-            goto start_exit;
-        }
-        workLoop->addEventSource(interrupt_source);
-        interrupt_source->enable();
     }
     
     PMinit();
