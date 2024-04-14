@@ -36,7 +36,6 @@ class VoodooI2CELANTouchpadDriver : public IOService {
     OSDeclareDefaultStructors(VoodooI2CELANTouchpadDriver);
 
     VoodooI2CDeviceNub* api;
-    IOACPIPlatformDevice* acpi_device;
 
  public:
     /* Initialises the VoodooI2CELANTouchpadDriver object/instance (intended as IOKit driver ctor)
@@ -77,7 +76,6 @@ class VoodooI2CELANTouchpadDriver : public IOService {
     int pressure_adjustment;
     int product_id;
 
-    IOCommandGate* command_gate;
     IOInterruptEventSource* interrupt_source;
     VoodooI2CMultitouchInterface *mt_interface;
     OSArray* transducers;

@@ -150,7 +150,7 @@ void VoodooI2CELANTouchpadDriver::interrupt_occurred(OSObject* owner, IOInterrup
     if (!ready_for_input || !awake)
         return;
 
-    command_gate->attemptAction(OSMemberFunctionCast(IOCommandGate::Action, this, &VoodooI2CELANTouchpadDriver::parse_ELAN_report));
+    parse_ELAN_report();
 }
 
 IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
@@ -270,11 +270,7 @@ VoodooI2CELANTouchpadDriver* VoodooI2CELANTouchpadDriver::probe(IOService* provi
     if (!super::probe(provider, score)) {
         return NULL;
     }
-    acpi_device = OSDynamicCast(IOACPIPlatformDevice, provider->getProperty("acpi-device"));
-    if (!acpi_device) {
-        IOLog("%s::%s Could not get ACPI device\n", getName(), elan_name);
-        return NULL;
-    }
+    
     // check for ELAN devices (DSDT must have ELAN* defined in the name property)
     OSData* name_data = OSDynamicCast(OSData, provider->getProperty("name"));
     if (!name_data) {
@@ -401,11 +397,6 @@ bool VoodooI2CELANTouchpadDriver::reset_device() {
 }
 
 void VoodooI2CELANTouchpadDriver::release_resources() {
-    if (command_gate) {
-        workLoop->removeEventSource(command_gate);
-        OSSafeReleaseNULL(command_gate);
-    }
-
     if (interrupt_source) {
         interrupt_source->disable();
         workLoop->removeEventSource(interrupt_source);
@@ -419,7 +410,6 @@ void VoodooI2CELANTouchpadDriver::release_resources() {
     }
 
     OSSafeReleaseNULL(workLoop);
-    OSSafeReleaseNULL(acpi_device);
 
     if (api) {
         if (api->isOpen(this)) {
@@ -477,12 +467,7 @@ bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
         return false;
     }
     workLoop->retain();
-    command_gate = IOCommandGate::commandGate(this);
-    if (!command_gate || (workLoop->addEventSource(command_gate) != kIOReturnSuccess)) {
-        IOLog("%s::%s Could not open command gate\n", getName(), elan_name);
-        goto start_exit;
-    }
-    acpi_device->retain();
+    
     if (!api->open(this)) {
         IOLog("%s::%s Could not open API\n", getName(), elan_name);
         goto start_exit;
