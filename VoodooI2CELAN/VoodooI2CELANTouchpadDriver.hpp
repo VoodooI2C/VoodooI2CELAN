@@ -76,6 +76,9 @@ class VoodooI2CELANTouchpadDriver : public IOService {
     int pressure_adjustment;
     int product_id;
 
+    unsigned int width_per_trace_x;
+    unsigned int width_per_trace_y;
+
     IOInterruptEventSource* interrupt_source;
     VoodooI2CMultitouchInterface *mt_interface;
     OSArray* transducers;

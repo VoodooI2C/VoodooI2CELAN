@@ -125,6 +125,15 @@ bool VoodooI2CELANTouchpadDriver::init_device() {
         IOLog("%s::%s Failed to get XY tracenum cmd\n", getName(), device_name);
         return false;
     }
+
+    UInt32 x_traces = val[0];
+    UInt32 y_traces = val[1];
+
+    if (x_traces == 0 || y_traces == 0) {
+        IOLog("%s::%s Traces == 0\n", getName(), device_name);
+        return false;
+    }
+
     retVal = read_ELAN_cmd(ETP_I2C_RESOLUTION_CMD, val);
     if (retVal != kIOReturnSuccess) {
         return false;
@@ -136,10 +145,20 @@ bool VoodooI2CELANTouchpadDriver::init_device() {
     hw_res_x = (hw_res_x * 10 + 790) * 10 / 254;
     hw_res_y = (hw_res_y * 10 + 790) * 10 / 254;
 
+    if (hw_res_x == 0 || hw_res_y == 0) {
+        IOLog("%s::%s HW resolution == 0\n", getName(), device_name);
+        return false;
+    }
+
+    UInt32 hw_phys_x = max_report_x * 100 / hw_res_x;
+    UInt32 hw_phys_y = max_report_y * 100 / hw_res_y;
+    width_per_trace_x = hw_phys_x / x_traces / 100;
+    width_per_trace_y = hw_phys_y / y_traces / 100;
+
     IOLog("%s::%s ProdID: %d Vers: %d Csum: %d IAPVers: %d Max X: %d Max Y: %d\n", getName(), device_name, product_id, version, csum, iapversion, max_report_x, max_report_y);
     if (mt_interface) {
-        mt_interface->physical_max_x = max_report_x * 100 / hw_res_x;
-        mt_interface->physical_max_y = max_report_y * 100 / hw_res_y;
+        mt_interface->physical_max_x = hw_phys_x;
+        mt_interface->physical_max_y = hw_phys_y;
         mt_interface->logical_max_x = max_report_x;
         mt_interface->logical_max_y = max_report_y;
     }
