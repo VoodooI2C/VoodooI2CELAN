@@ -162,7 +162,7 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
     UInt8 reportData[ETP_MAX_REPORT_LEN];
     memset(&reportData, 0, sizeof(reportData));
 
-    IOReturn retVal = read_raw_data(0, sizeof(reportData), reportData);
+    IOReturn retVal = api->readI2C(reportData, sizeof(reportData));
     if (retVal != kIOReturnSuccess) {
         IOLog("%s::%s Failed to handle input\n", getName(), device_name);
         return retVal;
@@ -325,12 +325,6 @@ IOReturn VoodooI2CELANTouchpadDriver::read_ELAN_cmd(UInt16 reg, UInt8* val) {
     return read_raw_16bit_data(reg, ETP_I2C_INF_LENGTH, val);
 }
 
-IOReturn VoodooI2CELANTouchpadDriver::read_raw_data(UInt8 reg, size_t len, UInt8* values) {
-    IOReturn retVal = kIOReturnSuccess;
-    retVal = api->writeReadI2C(&reg, 1, values, len);
-    return retVal;
-}
-
 IOReturn VoodooI2CELANTouchpadDriver::read_raw_16bit_data(UInt16 reg, size_t len, UInt8* values) {
     IOReturn retVal = kIOReturnSuccess;
     UInt16 buffer[] {
@@ -350,7 +344,7 @@ bool VoodooI2CELANTouchpadDriver::reset_device() {
     IOSleep(100);
     UInt8 val[256];
     UInt8 val2[3];
-    retVal = read_raw_data(0x00, ETP_I2C_INF_LENGTH, val);
+    retVal = api->readI2C(val, ETP_I2C_INF_LENGTH);
     if (retVal != kIOReturnSuccess) {
         IOLog("%s::%s Failed to get reset acknowledgement\n", getName(), device_name);
         return false;;
