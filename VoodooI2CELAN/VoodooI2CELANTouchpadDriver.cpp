@@ -210,10 +210,6 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
     uint64_t timestamp_ns;
     absolutetime_to_nanoseconds(timestamp, &timestamp_ns);
 
-    if (timestamp_ns - keytime < maxaftertyping)
-        return kIOReturnSuccess;
-
-
     UInt8* finger_data = &reportData[ETP_FINGER_DATA_OFFSET];
     UInt8 tp_info = reportData[ETP_TOUCH_INFO_OFFSET];
     int numFingers = 0;
@@ -259,8 +255,9 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
 
             if (transducer->confidence.value()) {
                 // 25mm comes from Microsoft precision touchpad specs
-                bool valid = pressure < 80 && x_mm < 25 && y_mm < 25;
-                transducer->confidence.update(valid, timestamp);
+                bool valid_size = pressure < 80 && x_mm < 25 && y_mm < 25;
+                bool quiet = (timestamp_ns - keytime) < maxaftertyping;
+                transducer->confidence.update(valid_size && !quiet, timestamp);
             }
 
             transducer->tip_switch.update(1, timestamp);
