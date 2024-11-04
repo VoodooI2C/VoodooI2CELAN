@@ -125,6 +125,15 @@ bool VoodooI2CELANTouchpadDriver::init_device() {
         IOLog("%s::%s Failed to get XY tracenum cmd\n", getName(), device_name);
         return false;
     }
+
+    UInt32 x_traces = val[0];
+    UInt32 y_traces = val[1];
+
+    if (x_traces == 0 || y_traces == 0) {
+        IOLog("%s::%s Traces == 0\n", getName(), device_name);
+        return false;
+    }
+
     retVal = read_ELAN_cmd(ETP_I2C_RESOLUTION_CMD, val);
     if (retVal != kIOReturnSuccess) {
         return false;
@@ -136,10 +145,20 @@ bool VoodooI2CELANTouchpadDriver::init_device() {
     hw_res_x = (hw_res_x * 10 + 790) * 10 / 254;
     hw_res_y = (hw_res_y * 10 + 790) * 10 / 254;
 
+    if (hw_res_x == 0 || hw_res_y == 0) {
+        IOLog("%s::%s HW resolution == 0\n", getName(), device_name);
+        return false;
+    }
+
+    UInt32 hw_phys_x = max_report_x * 100 / hw_res_x;
+    UInt32 hw_phys_y = max_report_y * 100 / hw_res_y;
+    width_per_trace_x = hw_phys_x / x_traces / 100;
+    width_per_trace_y = hw_phys_y / y_traces / 100;
+
     IOLog("%s::%s ProdID: %d Vers: %d Csum: %d IAPVers: %d Max X: %d Max Y: %d\n", getName(), device_name, product_id, version, csum, iapversion, max_report_x, max_report_y);
     if (mt_interface) {
-        mt_interface->physical_max_x = max_report_x * 100 / hw_res_x;
-        mt_interface->physical_max_y = max_report_y * 100 / hw_res_y;
+        mt_interface->physical_max_x = hw_phys_x;
+        mt_interface->physical_max_y = hw_phys_y;
         mt_interface->logical_max_x = max_report_x;
         mt_interface->logical_max_y = max_report_y;
     }
@@ -150,7 +169,7 @@ void VoodooI2CELANTouchpadDriver::interrupt_occurred(OSObject* owner, IOInterrup
     if (!ready_for_input || !awake)
         return;
 
-    command_gate->attemptAction(OSMemberFunctionCast(IOCommandGate::Action, this, &VoodooI2CELANTouchpadDriver::parse_ELAN_report));
+    parse_ELAN_report();
 }
 
 IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
@@ -191,10 +210,6 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
     uint64_t timestamp_ns;
     absolutetime_to_nanoseconds(timestamp, &timestamp_ns);
 
-    if (timestamp_ns - keytime < maxaftertyping)
-        return kIOReturnSuccess;
-
-
     UInt8* finger_data = &reportData[ETP_FINGER_DATA_OFFSET];
     UInt8 tp_info = reportData[ETP_TOUCH_INFO_OFFSET];
     int numFingers = 0;
@@ -207,33 +222,44 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
         bool contactValid = tp_info & (1U << (3 + i));
         transducer->is_valid = contactValid;
         if (contactValid) {
-            unsigned int posX = ((finger_data[0] & 0xf0) << 4) | finger_data[1];
-            unsigned int posY = ((finger_data[0] & 0x0f) << 8) | finger_data[2];
-            // unsigned int pressure = finger_data[4] + pressure_adjustment;
-            // unsigned int mk_x = (finger_data[3] & 0x0f);
-            // unsigned int mk_y = (finger_data[3] >> 4);
-            // unsigned int area_x = mk_x;
-            // unsigned int area_y = mk_y;
+            UInt16 posX = ((finger_data[0] & 0xf0) << 4) | finger_data[1];
+            UInt16 posY = ((finger_data[0] & 0x0f) << 8) | finger_data[2];
+            UInt16 pressure = finger_data[4] + pressure_adjustment;
+            UInt8 mk_x = (finger_data[3] & 0x0f);
+            UInt8 mk_y = (finger_data[3] >> 4);
+            unsigned int x_mm = mk_x * width_per_trace_x;
+            unsigned int y_mm = mk_y * width_per_trace_y;
 
             if (mt_interface) {
                 transducer->logical_max_x = mt_interface->logical_max_x;
                 transducer->logical_max_y = mt_interface->logical_max_y;
                 posY = transducer->logical_max_y - posY;
-                // area_x = mk_x * (transducer->logical_max_x - ETP_FWIDTH_REDUCE);
-                // area_y = mk_y * (transducer->logical_max_y - ETP_FWIDTH_REDUCE);
             }
 
             // unsigned int major = max(area_x, area_y);
             // unsigned int minor = min(area_x, area_y);
 
-            // if (pressure > ETP_MAX_PRESSURE)
-            //     pressure = ETP_MAX_PRESSURE;
+            if (pressure > ETP_MAX_PRESSURE)
+                pressure = ETP_MAX_PRESSURE;
 
             transducer->coordinates.x.update(posX, timestamp);
             transducer->coordinates.y.update(posY, timestamp);
             // transducer->touch_major.update(major, timestamp);
             // transducer->touch_minor.update(minor, timestamp);
             transducer->physical_button.update(tp_info & 0x01, timestamp);
+
+            // Reset confidence state if new valid contact
+            if (!transducer->tip_switch.value()) {
+                transducer->confidence.update(1, timestamp);
+            }
+
+            if (transducer->confidence.value()) {
+                // 25mm comes from Microsoft precision touchpad specs
+                bool valid_size = pressure < 80 && x_mm < 25 && y_mm < 25;
+                bool quiet = (timestamp_ns - keytime) < maxaftertyping;
+                transducer->confidence.update(valid_size && !quiet, timestamp);
+            }
+
             transducer->tip_switch.update(1, timestamp);
             transducer->id = i;
             transducer->secondary_id = i;
@@ -248,6 +274,7 @@ IOReturn VoodooI2CELANTouchpadDriver::parse_ELAN_report() {
             transducer->coordinates.y.update(transducer->coordinates.y.last.value, timestamp);
             transducer->physical_button.update(0, timestamp);
             transducer->tip_switch.update(0, timestamp);
+            transducer->confidence.update(0, timestamp);
             // transducer->pressure_physical_max = ETP_MAX_PRESSURE;
             // transducer->tip_pressure.update(0, timestamp);
         }
@@ -270,11 +297,7 @@ VoodooI2CELANTouchpadDriver* VoodooI2CELANTouchpadDriver::probe(IOService* provi
     if (!super::probe(provider, score)) {
         return NULL;
     }
-    acpi_device = OSDynamicCast(IOACPIPlatformDevice, provider->getProperty("acpi-device"));
-    if (!acpi_device) {
-        IOLog("%s::%s Could not get ACPI device\n", getName(), elan_name);
-        return NULL;
-    }
+    
     // check for ELAN devices (DSDT must have ELAN* defined in the name property)
     OSData* name_data = OSDynamicCast(OSData, provider->getProperty("name"));
     if (!name_data) {
@@ -401,11 +424,6 @@ bool VoodooI2CELANTouchpadDriver::reset_device() {
 }
 
 void VoodooI2CELANTouchpadDriver::release_resources() {
-    if (command_gate) {
-        workLoop->removeEventSource(command_gate);
-        OSSafeReleaseNULL(command_gate);
-    }
-
     if (interrupt_source) {
         interrupt_source->disable();
         workLoop->removeEventSource(interrupt_source);
@@ -419,7 +437,6 @@ void VoodooI2CELANTouchpadDriver::release_resources() {
     }
 
     OSSafeReleaseNULL(workLoop);
-    OSSafeReleaseNULL(acpi_device);
 
     if (api) {
         if (api->isOpen(this)) {
@@ -477,12 +494,7 @@ bool VoodooI2CELANTouchpadDriver::start(IOService* provider) {
         return false;
     }
     workLoop->retain();
-    command_gate = IOCommandGate::commandGate(this);
-    if (!command_gate || (workLoop->addEventSource(command_gate) != kIOReturnSuccess)) {
-        IOLog("%s::%s Could not open command gate\n", getName(), elan_name);
-        goto start_exit;
-    }
-    acpi_device->retain();
+    
     if (!api->open(this)) {
         IOLog("%s::%s Could not open API\n", getName(), elan_name);
         goto start_exit;
