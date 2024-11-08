@@ -39,6 +39,10 @@
 			<true/>
 			<key>QuietTimeAfterTyping</key>
 			<integer>500</integer>
+			<key>ForcePolling</key>
+			<false/>
+			<key>PollingInterval</key>
+			<integer>200</integer>
 		</dict>
 		<key>VoodooI2CHIDDevice</key>
 		<dict>
@@ -59,6 +63,10 @@
 			<true/>
 			<key>QuietTimeAfterTyping</key>
 			<integer>100</integer>
+			<key>ForcePolling</key>
+			<false/>
+			<key>PollingInterval</key>
+			<integer>200</integer>
 		</dict>
 	</dict>
 	<key>NSHumanReadableCopyright</key>

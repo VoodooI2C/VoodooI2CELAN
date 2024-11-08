@@ -169,6 +169,9 @@ class VoodooI2CELANTouchpadDriver : public IOService {
      */
     IOReturn message(UInt32 type, IOService* provider, void* argument) override;
     
+    uint32_t polling_interval;
+    bool force_polling;
+    bool setupPolling();
     void simulateInterrupt(OSObject* owner, IOTimerEventSource* timer);
 };
 
